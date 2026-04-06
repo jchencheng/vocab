@@ -20,7 +20,7 @@
       "dest": "api/generate.js"
     },
     {
-      "src": "\.(js|css|svg|png)$",
+      "src": "\\.(js|css|svg|png)$",
       "dest": "$1"
     },
     {
