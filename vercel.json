@@ -20,6 +20,10 @@
       "dest": "api/generate.js"
     },
     {
+      "src": "/assets/(.*)",
+      "dest": "/assets/$1"
+    },
+    {
       "src": "\\.(js|css|svg|png)$",
       "dest": "$1"
     },
