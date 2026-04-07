@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { db } from '../lib/indexedDB';
 
@@ -50,15 +50,16 @@ export function AIMemory() {
           wordList
         }),
       });
-
+      
       if (!response.ok) {
-        throw new Error(`API request failed: ${response.status}`);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `API request failed: ${response.status}`);
       }
-
+      
       // 处理 Vercel Function 响应
       const data = await response.json();
       const content = data.content;
-
+      
       const newContext: AIContextType = {
         id: crypto.randomUUID(),
         wordIds: selectedWordIds,
