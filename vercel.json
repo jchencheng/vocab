@@ -29,7 +29,7 @@
     },
     {
       "src": "/api/generate",
-      "dest": "api/edge.js"
+      "dest": "api/generate.js"
     },
     {
       "src": "/assets/(.*)",
