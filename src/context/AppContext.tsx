@@ -29,18 +29,7 @@ interface Word {
   customNote?: string;
 }
 
-interface APIConfig {
-  id: string;
-  name: string;
-  apiKey?: string;
-  apiEndpoint?: string;
-  model?: string;
-  isDefault?: boolean;
-}
-
 interface AppSettings {
-  apis?: APIConfig[];
-  currentApiId?: string;
   darkMode?: boolean;
   maxDailyReviews?: number;
 }
@@ -94,29 +83,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const savedSettings = await db.getSettings();
       console.log('Saved settings:', savedSettings);
       if (savedSettings) {
-        // 迁移旧的API设置结构到新的结构
-        if (savedSettings.apiKey || savedSettings.apiEndpoint || savedSettings.model) {
-          const apiId = crypto.randomUUID();
-          const migratedSettings = {
-            ...savedSettings,
-            apis: [{
-              id: apiId,
-              name: 'Default',
-              apiKey: savedSettings.apiKey,
-              apiEndpoint: savedSettings.apiEndpoint,
-              model: savedSettings.model,
-              isDefault: true
-            }],
-            currentApiId: apiId
-          };
-          delete migratedSettings.apiKey;
-          delete migratedSettings.apiEndpoint;
-          delete migratedSettings.model;
-          await saveSettings(migratedSettings);
-          setSettings(migratedSettings);
-        } else {
-          setSettings(savedSettings);
-        }
+        setSettings(savedSettings);
         setIsDarkMode(savedSettings.darkMode || false);
         console.log('Dark mode from settings:', savedSettings.darkMode);
         if (savedSettings.darkMode) {

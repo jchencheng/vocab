@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { db } from '../lib/indexedDB';
 
@@ -10,26 +10,43 @@ interface AIContextType {
 }
 
 export function AIMemory() {
-  const { words, settings } = useApp();
+  const { words } = useApp();
   const [selectedWordIds, setSelectedWordIds] = useState<string[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState('');
   const [contexts, setContexts] = useState<AIContextType[]>([]);
   const [showContexts, setShowContexts] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [password, setPassword] = useState('');
+  const [showPasswordInput, setShowPasswordInput] = useState(false);
 
   async function loadContexts() {
     const allContexts = await db.getAllContexts();
     setContexts(allContexts.sort((a, b) => b.createdAt - a.createdAt));
   }
 
+  // 密码验证
+  function handlePasswordSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    // 这里使用硬编码的密码，实际应用中应该从环境变量获取
+    const correctPassword = 'your-secret-password'; // 替换为你的密码
+    if (password === correctPassword) {
+      setIsAuthenticated(true);
+      setShowPasswordInput(false);
+      setError('');
+    } else {
+      setError('Incorrect password');
+    }
+  }
+
   async function generateContext() {
-    if (selectedWordIds.length === 0) {
-      setError('Please select at least one word');
+    if (!isAuthenticated) {
+      setShowPasswordInput(true);
       return;
     }
 
-    if (!settings.apiKey || !settings.apiEndpoint) {
-      setError('Please configure your API settings first');
+    if (selectedWordIds.length === 0) {
+      setError('Please select at least one word');
       return;
     }
 
@@ -40,107 +57,28 @@ export function AIMemory() {
     const wordList = selectedWords.map(w => w.word).join(', ');
 
     try {
-      // 检查是否是 Google Gemini API
-      const isGeminiAPI = settings.apiEndpoint.includes('generativelanguage.googleapis.com');
-      
       // 构建提示词
-      const prompt = isGeminiAPI
-        ? `将我提供的单词列表生成一篇雅思阅读难度的文章，目的是帮我记忆所提供的单词，确保不遗漏。高亮Word  List里的单词并在该单词后标注中文释义，逐段提供中英对照。如果融入一篇文章有难度，可拆分为不同的主题，但每个单词都需要出现，以下是单词列表：${wordList}`
-        : `将我提供的单词列表生成一篇雅思阅读难度的文章，目的是帮我记忆所提供的单词，确保不遗漏。高亮Word  List里的单词并在该单词后标注中文释义，逐段提供中英对照。如果融入一篇文章有难度，可拆分为不同的主题，但每个单词都需要出现，以下是单词列表：${wordList}`;
+      const prompt = `将我提供的单词列表生成一篇雅思阅读难度的文章，目的是帮我记忆所提供的单词，确保不遗漏。高亮Word  List里的单词并在该单词后标注中文释义，逐段提供中英对照。如果融入一篇文章有难度，可拆分为不同的主题，但每个单词都需要出现，以下是单词列表：${wordList}`;
       
-      let content;
-      
-      try {
-        // 尝试调用 Vercel Function
-        const response = await fetch('/api/generate', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            prompt,
-            apiKey: settings.apiKey,
-            apiEndpoint: settings.apiEndpoint,
-            model: settings.model,
-            isGeminiAPI,
-          }),
-        });
+      // 调用 Vercel Function
+      const response = await fetch('/api/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          prompt,
+          wordList
+        }),
+      });
 
-        if (!response.ok) {
-          throw new Error(`API request failed: ${response.status}`);
-        }
-
-        // 处理 Vercel Function 响应
-        const data = await response.json();
-        content = data.content;
-      } catch (vercelError) {
-        // Vercel Function 失败，可能是在本地开发环境中
-        console.warn('Vercel Function failed, trying direct API call:', vercelError);
-        
-        // 直接调用 API
-        let response;
-        if (isGeminiAPI) {
-          // Google Gemini API 格式
-          const apiUrl = settings.apiEndpoint.includes('generateContent') 
-            ? settings.apiEndpoint 
-            : `${settings.apiEndpoint}:generateContent`;
-          
-          // 确保 API 密钥在 URL 中
-          const finalUrl = apiUrl.includes('?') 
-            ? apiUrl 
-            : `${apiUrl}?key=${settings.apiKey}`;
-          
-          response = await fetch(finalUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              contents: [
-                {
-                  parts: [
-                    {
-                      text: prompt,
-                    },
-                  ],
-                },
-              ],
-            }),
-          });
-        } else {
-          // OpenAI API 格式
-          response = await fetch(settings.apiEndpoint, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${settings.apiKey}`,
-            },
-            body: JSON.stringify({
-              model: settings.model || 'gpt-3.5-turbo',
-              messages: [
-                {
-                  role: 'user',
-                  content: prompt,
-                },
-              ],
-              temperature: 0.7,
-            }),
-          });
-        }
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`API request failed: ${errorText}`);
-        }
-
-        // 处理 API 响应
-        const data = await response.json();
-        if (isGeminiAPI) {
-          content = data.candidates[0].content.parts[0].text;
-        } else {
-          content = data.choices[0].message.content;
-        }
+      if (!response.ok) {
+        throw new Error(`API request failed: ${response.status}`);
       }
+
+      // 处理 Vercel Function 响应
+      const data = await response.json();
+      const content = data.content;
 
       const newContext: AIContextType = {
         id: crypto.randomUUID(),
@@ -252,9 +190,46 @@ export function AIMemory() {
           <p className="text-gray-600 dark:text-gray-400">Select words to generate context-rich stories</p>
         </div>
 
-        {(!settings.apiKey || !settings.apiEndpoint) && (
-          <div className="mb-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-xl text-yellow-800 dark:text-yellow-400">
-            ⚠️ Please configure your API settings first in the Settings tab.
+
+
+        {showPasswordInput && (
+          <div className="mb-6 p-6 bg-white dark:bg-gray-900 dark:border-gray-800 rounded-2xl shadow-lg border border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Enter Password</h3>
+            <form onSubmit={handlePasswordSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Password
+                </label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter password to use AI features"
+                  required
+                />
+              </div>
+              {error && (
+                <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-600 dark:text-red-400 text-sm">
+                  {error}
+                </div>
+              )}
+              <div className="flex space-x-3">
+                <button
+                  type="submit"
+                  className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-medium hover:opacity-90 transition-opacity"
+                >
+                  Submit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowPasswordInput(false)}
+                  className="px-6 py-3 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 dark:bg-gray-900 rounded-xl font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
           </div>
         )}
 
@@ -296,7 +271,7 @@ export function AIMemory() {
         <div className="text-center mb-6">
           <button
             onClick={generateContext}
-            disabled={isGenerating || selectedWordIds.length === 0 || !settings.apiKey || !settings.apiEndpoint}
+            disabled={isGenerating || selectedWordIds.length === 0}
             className="px-8 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
           >
             {isGenerating ? 'Generating...' : 'Generate Story'}
