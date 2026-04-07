@@ -16,34 +16,13 @@ export function AIMemory() {
   const [error, setError] = useState('');
   const [contexts, setContexts] = useState<AIContextType[]>([]);
   const [showContexts, setShowContexts] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [password, setPassword] = useState('');
-  const [showPasswordInput, setShowPasswordInput] = useState(false);
 
   async function loadContexts() {
     const allContexts = await db.getAllContexts();
     setContexts(allContexts.sort((a, b) => b.createdAt - a.createdAt));
   }
 
-  // 密码验证
-  function handlePasswordSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    // 这里使用硬编码的密码，实际应用中应该从环境变量获取
-    const correctPassword = 'your-secret-password'; // 替换为你的密码
-    if (password === correctPassword) {
-      setIsAuthenticated(true);
-      setShowPasswordInput(false);
-      setError('');
-    } else {
-      setError('Incorrect password');
-    }
-  }
-
   async function generateContext() {
-    if (!isAuthenticated) {
-      setShowPasswordInput(true);
-      return;
-    }
 
     if (selectedWordIds.length === 0) {
       setError('Please select at least one word');
@@ -191,47 +170,6 @@ export function AIMemory() {
         </div>
 
 
-
-        {showPasswordInput && (
-          <div className="mb-6 p-6 bg-white dark:bg-gray-900 dark:border-gray-800 rounded-2xl shadow-lg border border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Enter Password</h3>
-            <form onSubmit={handlePasswordSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Password
-                </label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Enter password to use AI features"
-                  required
-                />
-              </div>
-              {error && (
-                <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-600 dark:text-red-400 text-sm">
-                  {error}
-                </div>
-              )}
-              <div className="flex space-x-3">
-                <button
-                  type="submit"
-                  className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-medium hover:opacity-90 transition-opacity"
-                >
-                  Submit
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowPasswordInput(false)}
-                  className="px-6 py-3 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 dark:bg-gray-900 rounded-xl font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        )}
 
         {error && (
           <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-red-600 dark:text-red-400">
