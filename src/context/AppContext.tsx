@@ -1,45 +1,8 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import type { ReactNode } from 'react';
-import { db } from '../lib/indexedDB';
-
-interface Word {
-  id: string;
-  word: string;
-  phonetic?: string;
-  phonetics?: Array<{ text?: string; audio?: string }>;
-  meanings: Array<{
-    partOfSpeech: string;
-    definitions: Array<{
-      definition: string;
-      example?: string;
-      synonyms: string[];
-      antonyms: string[];
-      chineseDefinition?: string;
-    }>;
-    synonyms: string[];
-    antonyms: string[];
-  }>;
-  tags: string[];
-  createdAt: number;
-  nextReviewAt: number;
-  reviewCount: number;
-  easeFactor: number;
-  interval: number;
-  quality: number;
-  customNote?: string;
-}
-
-interface AppSettings {
-  darkMode?: boolean;
-  maxDailyReviews?: number;
-}
-
-interface ReviewStats {
-  total: number;
-  dueToday: number;
-  mastered: number;
-  learning: number;
-}
+import type { Word, AppSettings, ReviewStats } from '../types';
+import { db } from '../services';
+import { calculateStats } from '../utils';
 
 interface AppContextType {
   words: Word[];
@@ -63,110 +26,92 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState(false);
 
-  useEffect(() => {
-    initDB();
-  }, []);
-
-  // 确保 isDarkMode 状态和 DOM 状态同步
-  useEffect(() => {
-    console.log('isDarkMode state changed:', isDarkMode);
-    // 直接使用 classList.toggle 方法
-    document.documentElement.classList.toggle('dark', isDarkMode);
-    console.log('Document classList after useEffect:', document.documentElement.classList);
-  }, [isDarkMode]);
-
-  async function initDB() {
-    try {
-      console.log('initDB called');
-      await db.init();
-      await refreshWords();
-      const savedSettings = await db.getSettings();
-      console.log('Saved settings:', savedSettings);
-      if (savedSettings) {
-        setSettings(savedSettings);
-        setIsDarkMode(savedSettings.darkMode || false);
-        console.log('Dark mode from settings:', savedSettings.darkMode);
-        if (savedSettings.darkMode) {
-          console.log('Adding dark class during init');
-          document.documentElement.classList.add('dark');
-          console.log('Document classList after init:', document.documentElement.classList);
-        }
-      }
-    } catch (error) {
-      console.error('Error initializing DB:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  async function toggleDarkMode() {
-    console.log('toggleDarkMode called');
-    const newDarkMode = !isDarkMode;
-    console.log('New dark mode:', newDarkMode);
-    
-    // 更新状态
-    setIsDarkMode(newDarkMode);
-    
-    // 保存设置
-    await saveSettings({ ...settings, darkMode: newDarkMode });
-    console.log('Settings saved');
-  }
-
-  async function refreshWords() {
+  const refreshWords = useCallback(async () => {
     const allWords = await db.getAllWords();
     setWords(allWords);
-  }
+  }, []);
 
-  async function addWord(word: Word) {
+  const addWord = useCallback(async (word: Word) => {
     await db.addWord(word);
     await refreshWords();
-  }
+  }, [refreshWords]);
 
-  async function updateWord(word: Word) {
+  const updateWord = useCallback(async (word: Word) => {
     await db.updateWord(word);
     await refreshWords();
-  }
+  }, [refreshWords]);
 
-  async function deleteWord(id: string) {
+  const deleteWord = useCallback(async (id: string) => {
     await db.deleteWord(id);
     await refreshWords();
-  }
+  }, [refreshWords]);
 
-  async function saveSettings(newSettings: AppSettings) {
+  const saveSettings = useCallback(async (newSettings: AppSettings) => {
     await db.saveSettings(newSettings);
     setSettings(newSettings);
-  }
+  }, []);
 
-  function getStats(): ReviewStats {
-    const now = Date.now();
-    const dueToday = words.filter(w => w.nextReviewAt <= now).length;
-    const mastered = words.filter(w => w.interval >= 30).length;
-    const learning = words.filter(w => w.interval < 30 && w.reviewCount > 0).length;
+  const toggleDarkMode = useCallback(async () => {
+    const newDarkMode = !isDarkMode;
+    setIsDarkMode(newDarkMode);
+    await saveSettings({ ...settings, darkMode: newDarkMode });
+  }, [isDarkMode, settings, saveSettings]);
 
-    return {
-      total: words.length,
-      dueToday,
-      mastered,
-      learning,
-    };
-  }
+  const getStats = useCallback((): ReviewStats => {
+    return calculateStats(words);
+  }, [words]);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', isDarkMode);
+  }, [isDarkMode]);
+
+  useEffect(() => {
+    async function initDB() {
+      try {
+        await db.init();
+        await refreshWords();
+        const savedSettings = await db.getSettings();
+        if (savedSettings) {
+          setSettings(savedSettings);
+          setIsDarkMode(savedSettings.darkMode || false);
+        }
+      } catch (error) {
+        console.error('Error initializing DB:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    initDB();
+  }, [refreshWords]);
+
+  const value = useMemo(() => ({
+    words,
+    settings,
+    isLoading,
+    refreshWords,
+    addWord,
+    updateWord,
+    deleteWord,
+    saveSettings,
+    getStats,
+    toggleDarkMode,
+    isDarkMode,
+  }), [
+    words,
+    settings,
+    isLoading,
+    refreshWords,
+    addWord,
+    updateWord,
+    deleteWord,
+    saveSettings,
+    getStats,
+    toggleDarkMode,
+    isDarkMode,
+  ]);
 
   return (
-    <AppContext.Provider
-      value={{
-        words,
-        settings,
-        isLoading,
-        refreshWords,
-        addWord,
-        updateWord,
-        deleteWord,
-        saveSettings,
-        getStats,
-        toggleDarkMode,
-        isDarkMode,
-      }}
-    >
+    <AppContext.Provider value={value}>
       {children}
     </AppContext.Provider>
   );

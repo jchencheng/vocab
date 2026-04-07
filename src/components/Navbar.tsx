@@ -1,6 +1,5 @@
-
-
 import { useApp } from '../context/AppContext';
+import { TABS } from '../constants';
 
 interface NavbarProps {
   activeTab: string;
@@ -9,13 +8,6 @@ interface NavbarProps {
 
 export function Navbar({ activeTab, onTabChange }: NavbarProps) {
   const { isDarkMode, toggleDarkMode } = useApp();
-  const tabs = [
-    { id: 'add', label: 'Add Word', icon: '➕' },
-    { id: 'words', label: 'Word List', icon: '📚' },
-    { id: 'review', label: 'Review', icon: '🎯' },
-    { id: 'ai', label: 'AI Memory', icon: '🤖' },
-    { id: 'settings', label: 'Settings', icon: '⚙️' },
-  ];
 
   return (
     <nav className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-50 dark:bg-gray-900 dark:border-gray-800">
@@ -28,7 +20,7 @@ export function Navbar({ activeTab, onTabChange }: NavbarProps) {
             </h1>
           </div>
           <div className="flex gap-1">
-            {tabs.map((tab) => (
+            {TABS.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => onTabChange(tab.id)}

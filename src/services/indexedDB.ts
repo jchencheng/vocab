@@ -1,48 +1,5 @@
-interface Word {
-  id: string;
-  word: string;
-  phonetic?: string;
-  phonetics?: Array<{ text?: string; audio?: string }>;
-  meanings: Array<{
-    partOfSpeech: string;
-    definitions: Array<{
-      definition: string;
-      example?: string;
-      synonyms: string[];
-      antonyms: string[];
-    }>;
-    synonyms: string[];
-    antonyms: string[];
-  }>;
-  tags: string[];
-  createdAt: number;
-  nextReviewAt: number;
-  reviewCount: number;
-  easeFactor: number;
-  interval: number;
-  quality: number;
-  customNote?: string;
-}
-
-interface AppSettings {
-  apiKey?: string;
-  apiEndpoint?: string;
-  model?: string;
-  darkMode?: boolean;
-}
-
-interface AIContext {
-  id: string;
-  wordIds: string[];
-  content: string;
-  createdAt: number;
-}
-
-const DB_NAME = 'VocabDB';
-const DB_VERSION = 1;
-const STORE_WORDS = 'words';
-const STORE_SETTINGS = 'settings';
-const STORE_CONTEXTS = 'contexts';
+import type { Word, AppSettings, AIContext } from '../types';
+import { DB_NAME, DB_VERSION, STORE_WORDS, STORE_SETTINGS, STORE_CONTEXTS } from '../constants';
 
 class IndexedDBService {
   private db: IDBDatabase | null = null;

@@ -1,72 +1,32 @@
-import { useState, useEffect } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
-import { calculateNextReview } from '../lib/spacedRepetition';
-
-interface Word {
-  id: string;
-  word: string;
-  phonetic?: string;
-  phonetics?: Array<{ text?: string; audio?: string }>;
-  meanings: Array<{
-    partOfSpeech: string;
-    definitions: Array<{
-      definition: string;
-      example?: string;
-      synonyms: string[];
-      antonyms: string[];
-      chineseDefinition?: string;
-    }>;
-    synonyms: string[];
-    antonyms: string[];
-  }>;
-  tags: string[];
-  createdAt: number;
-  nextReviewAt: number;
-  reviewCount: number;
-  easeFactor: number;
-  interval: number;
-  quality: number;
-  customNote?: string;
-}
-
-type ReviewMode = 'en2zh' | 'zh2en';
+import { calculateNextReview, getDueWords, shuffleWords, limitWords, getChineseDefinition, playAudio, hasAudio } from '../utils';
+import { DEFAULT_MAX_DAILY_REVIEWS } from '../constants';
+import type { ReviewMode } from '../types';
 
 export function Review() {
   const { words, updateWord, settings } = useApp();
-  const [reviewQueue, setReviewQueue] = useState<Word[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showAnswer, setShowAnswer] = useState(false);
   const [reviewMode, setReviewMode] = useState<ReviewMode>('en2zh');
   const [isComplete, setIsComplete] = useState(false);
 
-  useEffect(() => {
-    const now = Date.now();
-    const due = words.filter(w => w.nextReviewAt <= now);
-    due.sort(() => Math.random() - 0.5);
-    
-    // Apply max daily reviews limit
-    const maxDailyReviews = settings.maxDailyReviews || 50; // Default to 50 if not set
-    const limitedQueue = due.slice(0, maxDailyReviews);
-    
-    setReviewQueue(limitedQueue);
+  const reviewQueue = useMemo(() => {
+    const due = getDueWords(words);
+    const shuffled = shuffleWords(due);
+    const maxDailyReviews = settings.maxDailyReviews || DEFAULT_MAX_DAILY_REVIEWS;
+    return limitWords(shuffled, maxDailyReviews);
   }, [words, settings.maxDailyReviews]);
 
   const currentWord = reviewQueue[currentIndex];
 
-  function playAudio() {
-    if (!currentWord) return;
-    const audioUrl = currentWord.phonetics?.find(p => p.audio)?.audio;
-    if (audioUrl) {
-      new Audio(audioUrl).play();
+  const handlePlayAudio = useCallback(() => {
+    if (currentWord) {
+      playAudio(currentWord.phonetics);
     }
-  }
+  }, [currentWord]);
 
-  function getChineseDefinition(word: Word): string {
-    const defs = word.meanings.flatMap(m => m.definitions.map(d => d.chineseDefinition || d.definition));
-    return defs.slice(0, 3).join('; ');
-  }
-
-  async function handleQuality(quality: number) {
+  const handleQuality = useCallback(async (quality: number) => {
     if (!currentWord) return;
 
     const updatedWord = calculateNextReview(currentWord, quality);
@@ -75,25 +35,16 @@ export function Review() {
     if (currentIndex + 1 >= reviewQueue.length) {
       setIsComplete(true);
     } else {
-      setCurrentIndex(currentIndex + 1);
+      setCurrentIndex(prev => prev + 1);
       setShowAnswer(false);
     }
-  }
+  }, [currentWord, currentIndex, reviewQueue.length, updateWord]);
 
-  function reset() {
-    const now = Date.now();
-    const due = words.filter(w => w.nextReviewAt <= now);
-    due.sort(() => Math.random() - 0.5);
-    
-    // Apply max daily reviews limit
-    const maxDailyReviews = settings.maxDailyReviews || 50; // Default to 50 if not set
-    const limitedQueue = due.slice(0, maxDailyReviews);
-    
-    setReviewQueue(limitedQueue);
+  const reset = useCallback(() => {
     setCurrentIndex(0);
     setShowAnswer(false);
     setIsComplete(false);
-  }
+  }, []);
 
   if (reviewQueue.length === 0) {
     return (
@@ -194,9 +145,9 @@ export function Review() {
               <div>
                 <div className="flex items-center justify-center gap-3 mb-2">
                   <h3 className="text-4xl font-bold text-gray-800 dark:text-white">{currentWord.word}</h3>
-                  {currentWord.phonetics?.some(p => p.audio) && (
+                  {hasAudio(currentWord.phonetics) && (
                     <button
-                      onClick={playAudio}
+                      onClick={handlePlayAudio}
                       className="p-2 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full hover:bg-blue-200 dark:hover:bg-blue-800/30 transition-colors"
                     >
                       🔊
@@ -233,9 +184,9 @@ export function Review() {
                   <div>
                     <div className="flex items-center justify-center gap-3 mb-2">
                       <h3 className="text-4xl font-bold text-gray-800 dark:text-white">{currentWord.word}</h3>
-                      {currentWord.phonetics?.some(p => p.audio) && (
+                      {hasAudio(currentWord.phonetics) && (
                         <button
-                          onClick={playAudio}
+                          onClick={handlePlayAudio}
                           className="p-2 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full hover:bg-blue-200 dark:hover:bg-blue-800/30 transition-colors"
                         >
                           🔊
