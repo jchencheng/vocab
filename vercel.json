@@ -14,6 +14,10 @@
       "use": "@vercel/edge"
     },
     {
+      "src": "api/simple.js",
+      "use": "@vercel/node"
+    },
+    {
       "src": "package.json",
       "use": "@vercel/static-build",
       "config": {
@@ -29,7 +33,7 @@
     },
     {
       "src": "/api/generate",
-      "dest": "api/generate.js"
+      "dest": "api/simple.js"
     },
     {
       "src": "/assets/(.*)",

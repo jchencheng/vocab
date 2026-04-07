@@ -1,5 +1,3 @@
-import { GoogleGenAI } from '@google/genai';
-
 export default async function handler(req, res) {
   try {
     console.log('Request received:', req.method, req.url);
@@ -27,39 +25,48 @@ export default async function handler(req, res) {
 
     console.log('API key found, making request to Gemini API');
 
-    // 使用 GoogleGenAI SDK
-    const ai = new GoogleGenAI({
-      apiKey: apiKey,
-    });
-
+    // 使用 Gemini REST API
     const model = 'gemini-2.0-flash';
-    const contents = [
-      {
-        role: 'user',
-        parts: [
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [
           {
-            text: prompt,
+            role: 'user',
+            parts: [
+              {
+                text: prompt,
+              },
+            ],
           },
         ],
-      },
-    ];
-
-    const response = await ai.models.generateContentStream({
-      model,
-      contents,
+      }),
     });
 
-    // 收集所有流式响应内容
-    let fullContent = '';
-    for await (const chunk of response) {
-      if (chunk.text) {
-        fullContent += chunk.text;
-      }
+    console.log('Gemini API response status:', response.status);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.log('Gemini API error:', errorText);
+      return res.status(500).json({ error: `API request failed: ${errorText}` });
     }
 
-    console.log('Generated content length:', fullContent.length);
+    const data = await response.json();
+    console.log('Gemini API response data:', JSON.stringify(data).slice(0, 500));
 
-    res.status(200).json({ content: fullContent });
+    if (!data.candidates || !data.candidates[0] || !data.candidates[0].content || !data.candidates[0].content.parts || !data.candidates[0].content.parts[0]) {
+      console.log('Invalid response structure:', data);
+      return res.status(500).json({ error: 'Invalid response from Gemini API' });
+    }
+
+    const content = data.candidates[0].content.parts[0].text;
+
+    res.status(200).json({ content });
   } catch (error) {
     console.error('Error in generate function:', error);
     res.status(500).json({ error: `Failed to generate content: ${error.message}` });
