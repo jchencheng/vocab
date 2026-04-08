@@ -1,5 +1,5 @@
 import { supabase, toSupabaseWord, fromSupabaseWord, toSupabaseContext, fromSupabaseContext, toSupabaseSettings, fromSupabaseSettings } from './supabase';
-import type { Word, AIContext, UserSettings } from '../types';
+import type { Word, AIContext, AppSettings } from '../types';
 
 export class SupabaseService {
   // ========== Words ==========
@@ -116,7 +116,7 @@ export class SupabaseService {
 
   // ========== Settings ==========
   
-  async getSettings(userId: string): Promise<UserSettings | null> {
+  async getSettings(userId: string): Promise<AppSettings | null> {
     const { data, error } = await supabase
       .from('settings')
       .select('*')
@@ -135,7 +135,7 @@ export class SupabaseService {
     return data ? fromSupabaseSettings(data) : null;
   }
 
-  async saveSettings(settings: UserSettings, userId: string): Promise<void> {
+  async saveSettings(settings: AppSettings, userId: string): Promise<void> {
     const supabaseSettings = toSupabaseSettings(settings, userId);
     
     // Try to update first
