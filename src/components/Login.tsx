@@ -25,14 +25,12 @@ export function Login() {
     }
 
     if (isSignUp) {
-      const { error, needsEmailConfirmation } = await signUp(email, password);
+      const { error } = await signUp(email, password);
       if (error) {
         setError(error.message);
-      } else if (needsEmailConfirmation) {
-        setSuccessMessage('Please check your email to confirm your account');
       } else {
-        setSuccessMessage('Account created successfully! You can now sign in.');
-        setIsSignUp(false);
+        // 注册成功，自动登录，不需要邮箱验证
+        setSuccessMessage('Account created successfully! You are now signed in.');
       }
     } else {
       const { error } = await signIn(email, password);

@@ -67,3 +67,21 @@ export interface TabItem {
   label: string;
   icon: string;
 }
+
+// ============================================
+// 独立用户系统类型定义
+// ============================================
+
+export interface AppUser {
+  id: string;
+  email: string;
+  passwordHash: string; // 存储 bcrypt 哈希值
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface UserSession {
+  user: AppUser;
+  token: string;
+  expiresAt: number;
+}

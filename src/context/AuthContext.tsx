@@ -1,86 +1,121 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
-import { supabase } from '../services/supabase';
-import type { User, Session } from '@supabase/supabase-js';
+import { supabaseService } from '../services/supabaseService';
+import type { AppUser, UserSession } from '../types';
 
 interface AuthContextType {
-  user: User | null;
-  session: Session | null;
+  user: AppUser | null;
   isLoading: boolean;
   isAuthenticated: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (email: string, password: string) => Promise<{ error: Error | null; needsEmailConfirmation: boolean }>;
+  signUp: (email: string, password: string) => Promise<{ error: Error | null; user: AppUser | null }>;
   signOut: () => Promise<void>;
-  resetPassword: (email: string) => Promise<{ error: Error | null }>;
+  resetPassword: (email: string, newPassword: string) => Promise<{ error: Error | null }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// 获取当前网站的 URL（用于邮箱验证和密码重置）
-const getSiteUrl = () => {
-  // 优先使用环境变量中的 URL，否则使用当前页面 origin
-  return import.meta.env.VITE_SITE_URL || window.location.origin;
-};
+// Session storage key
+const SESSION_KEY = 'vocab_app_session';
+
+// 生成简单的 session token
+function generateToken(): string {
+  return crypto.randomUUID();
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // 从 localStorage 恢复 session
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setIsLoading(false);
-    });
+    const initAuth = () => {
+      try {
+        const sessionJson = localStorage.getItem(SESSION_KEY);
+        if (sessionJson) {
+          const session: UserSession = JSON.parse(sessionJson);
+          // 检查 session 是否过期
+          if (session.expiresAt > Date.now()) {
+            setUser(session.user);
+          } else {
+            localStorage.removeItem(SESSION_KEY);
+          }
+        }
+      } catch (error) {
+        console.error('Error restoring session:', error);
+        localStorage.removeItem(SESSION_KEY);
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setIsLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    initAuth();
   }, []);
 
   const signIn = useCallback(async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    return { error: error as Error | null };
+    try {
+      const user = await supabaseService.verifyUser(email, password);
+      if (!user) {
+        return { error: new Error('邮箱或密码错误') };
+      }
+
+      // 创建 session
+      const session: UserSession = {
+        user,
+        token: generateToken(),
+        expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7天过期
+      };
+
+      localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+      setUser(user);
+      return { error: null };
+    } catch (error) {
+      console.error('Sign in error:', error);
+      return { error: error as Error };
+    }
   }, []);
 
   const signUp = useCallback(async (email: string, password: string) => {
-    const { error, data } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: `${getSiteUrl()}/login`,
-      },
-    });
-    
-    // Check if email confirmation is required
-    const needsEmailConfirmation = !error && !!data.user && !!data.user.identities && data.user.identities.length === 0;
-    
-    return { error: error as Error | null, needsEmailConfirmation };
+    try {
+      const user = await supabaseService.createUser(email, password);
+
+      // 自动登录
+      const session: UserSession = {
+        user,
+        token: generateToken(),
+        expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000,
+      };
+
+      localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+      setUser(user);
+      return { error: null, user };
+    } catch (error) {
+      console.error('Sign up error:', error);
+      return { error: error as Error, user: null };
+    }
   }, []);
 
   const signOut = useCallback(async () => {
-    await supabase.auth.signOut();
+    localStorage.removeItem(SESSION_KEY);
+    setUser(null);
   }, []);
 
-  const resetPassword = useCallback(async (email: string) => {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${getSiteUrl()}/reset-password`,
-    });
-    return { error: error as Error | null };
+  const resetPassword = useCallback(async (email: string, newPassword: string) => {
+    try {
+      const existingUser = await supabaseService.getUserByEmail(email);
+      if (!existingUser) {
+        return { error: new Error('该邮箱未注册') };
+      }
+
+      await supabaseService.updateUserPassword(existingUser.id, newPassword);
+      return { error: null };
+    } catch (error) {
+      console.error('Reset password error:', error);
+      return { error: error as Error };
+    }
   }, []);
 
   const value: AuthContextType = {
     user,
-    session,
     isLoading,
     isAuthenticated: !!user,
     signIn,
