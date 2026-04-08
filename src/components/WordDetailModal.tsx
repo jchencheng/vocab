@@ -2,7 +2,8 @@ import { useState, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
 import { fetchWord } from '../services/dictionaryAPI';
 import { getIntervalText, playAudio, hasAudio, parseTags } from '../utils';
-import type { Word, Meaning } from '../types';
+import { useWordEditor } from '../hooks/useWordEditor';
+import type { Word } from '../types';
 
 interface WordDetailModalProps {
   word: Word;
@@ -13,122 +14,45 @@ interface WordDetailModalProps {
 export function WordDetailModal({ word, onClose, onDelete }: WordDetailModalProps) {
   const { updateWord, settings } = useApp();
   const [isEditing, setIsEditing] = useState(false);
-  const [editWord, setEditWord] = useState(word.word);
-  const [editPhonetic, setEditPhonetic] = useState(word.phonetic || '');
-  const [editMeanings, setEditMeanings] = useState<Meaning[]>(
-    word.meanings.map(m => ({
-      ...m,
-      definitions: m.definitions.map(d => ({ ...d })),
-    }))
-  );
-  const [editTags, setEditTags] = useState(word.tags.join(', '));
-  const [editNote, setEditNote] = useState(word.customNote || '');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const editor = useWordEditor({ initialWord: word });
+
   const handleGetDefinitions = useCallback(async () => {
-    if (!editWord.trim()) return;
+    if (!editor.editWord.trim()) return;
 
     setIsLoading(true);
     setError('');
 
     try {
-      const wordData = await fetchWord(editWord.trim(), settings);
-      setEditPhonetic(wordData.phonetic || '');
-      setEditMeanings(wordData.meanings);
-    } catch (err: any) {
+      const wordData = await fetchWord(editor.editWord.trim(), settings);
+      editor.setEditPhonetic(wordData.phonetic || '');
+      editor.setEditMeanings(wordData.meanings);
+    } catch {
       setError('Failed to get definitions. Please check the word spelling.');
     } finally {
       setIsLoading(false);
     }
-  }, [editWord, settings]);
+  }, [editor, settings]);
 
   const handlePlayAudio = useCallback(() => {
     playAudio(word.phonetics);
   }, [word.phonetics]);
 
-  const handleUpdateMeaning = useCallback((meaningIdx: number, field: 'partOfSpeech', value: string) => {
-    setEditMeanings(prev =>
-      prev.map((meaning, idx) => (idx === meaningIdx ? { ...meaning, [field]: value } : meaning))
-    );
-  }, []);
-
-  const handleUpdateDefinition = useCallback(
-    (meaningIdx: number, defIdx: number, field: 'definition' | 'example' | 'chineseDefinition', value: string) => {
-      setEditMeanings(prev =>
-        prev.map((meaning, mIdx) =>
-          mIdx === meaningIdx
-            ? {
-                ...meaning,
-                definitions: meaning.definitions.map((def, dIdx) =>
-                  dIdx === defIdx ? { ...def, [field]: value } : def
-                ),
-              }
-            : meaning
-        )
-      );
-    },
-    []
-  );
-
-  const handleAddDefinition = useCallback((meaningIdx: number) => {
-    setEditMeanings(prev =>
-      prev.map((meaning, idx) =>
-        idx === meaningIdx
-          ? {
-              ...meaning,
-              definitions: [...meaning.definitions, { definition: '', example: '', synonyms: [], antonyms: [] }],
-            }
-          : meaning
-      )
-    );
-  }, []);
-
-  const handleRemoveDefinition = useCallback((meaningIdx: number, defIdx: number) => {
-    setEditMeanings(prev =>
-      prev.map((meaning, mIdx) =>
-        mIdx === meaningIdx
-          ? { ...meaning, definitions: meaning.definitions.filter((_, dIdx) => dIdx !== defIdx) }
-          : meaning
-      )
-    );
-  }, []);
-
-  const handleAddMeaning = useCallback(() => {
-    setEditMeanings(prev => [
-      ...prev,
-      {
-        partOfSpeech: 'unknown',
-        definitions: [{ definition: '', example: '', synonyms: [], antonyms: [] }],
-        synonyms: [],
-        antonyms: [],
-      },
-    ]);
-  }, []);
-
-  const handleRemoveMeaning = useCallback((meaningIdx: number) => {
-    if (editMeanings.length > 1) {
-      setEditMeanings(prev => prev.filter((_, idx) => idx !== meaningIdx));
-    }
-  }, [editMeanings.length]);
-
   const handleSave = useCallback(async () => {
-    const tags = parseTags(editTags);
+    const tags = parseTags(editor.editTags);
 
     const updatedWord: Word = {
-      ...word,
-      word: editWord,
-      phonetic: editPhonetic || undefined,
-      meanings: editMeanings,
+      ...editor.getEditedWord(word),
       tags,
-      customNote: editNote || undefined,
     };
 
     await updateWord(updatedWord);
     setIsEditing(false);
     onClose();
-  }, [word, editWord, editPhonetic, editMeanings, editTags, editNote, updateWord, onClose]);
+  }, [word, editor, updateWord, onClose]);
 
   const handleDelete = useCallback(async () => {
     await onDelete(word.id);
@@ -137,18 +61,9 @@ export function WordDetailModal({ word, onClose, onDelete }: WordDetailModalProp
 
   const handleCancelEdit = useCallback(() => {
     setIsEditing(false);
-    setEditWord(word.word);
-    setEditPhonetic(word.phonetic || '');
-    setEditMeanings(
-      word.meanings.map(m => ({
-        ...m,
-        definitions: m.definitions.map(d => ({ ...d })),
-      }))
-    );
-    setEditTags(word.tags.join(', '));
-    setEditNote(word.customNote || '');
     setError('');
-  }, [word]);
+    editor.resetToOriginal();
+  }, [editor]);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -163,13 +78,13 @@ export function WordDetailModal({ word, onClose, onDelete }: WordDetailModalProp
                     <div className="flex gap-2">
                       <input
                         type="text"
-                        value={editWord}
-                        onChange={(e) => setEditWord(e.target.value)}
+                        value={editor.editWord}
+                        onChange={(e) => editor.setEditWord(e.target.value)}
                         className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                       <button
                         onClick={handleGetDefinitions}
-                        disabled={isLoading || !editWord.trim()}
+                        disabled={isLoading || !editor.editWord.trim()}
                         className="px-3 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity whitespace-nowrap"
                       >
                         {isLoading ? 'Getting...' : 'Get Definitions'}
@@ -185,8 +100,8 @@ export function WordDetailModal({ word, onClose, onDelete }: WordDetailModalProp
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Phonetic</label>
                     <input
                       type="text"
-                      value={editPhonetic}
-                      onChange={(e) => setEditPhonetic(e.target.value)}
+                      value={editor.editPhonetic}
+                      onChange={(e) => editor.setEditPhonetic(e.target.value)}
                       placeholder="e.g., /ˈæp.əl/"
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
@@ -195,8 +110,8 @@ export function WordDetailModal({ word, onClose, onDelete }: WordDetailModalProp
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tags (comma-separated)</label>
                     <input
                       type="text"
-                      value={editTags}
-                      onChange={(e) => setEditTags(e.target.value)}
+                      value={editor.editTags}
+                      onChange={(e) => editor.setEditTags(e.target.value)}
                       placeholder="e.g., TOEFL, business, important"
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
@@ -262,7 +177,7 @@ export function WordDetailModal({ word, onClose, onDelete }: WordDetailModalProp
             {isEditing ? (
               <div>
                 <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-3">Meanings</h3>
-                {editMeanings.map((meaning, meaningIdx) => (
+                {editor.editMeanings.map((meaning, meaningIdx) => (
                   <div key={meaningIdx} className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 mb-4">
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex-1">
@@ -272,14 +187,14 @@ export function WordDetailModal({ word, onClose, onDelete }: WordDetailModalProp
                         <input
                           type="text"
                           value={meaning.partOfSpeech}
-                          onChange={(e) => handleUpdateMeaning(meaningIdx, 'partOfSpeech', e.target.value)}
+                          onChange={(e) => editor.updateMeaning(meaningIdx, 'partOfSpeech', e.target.value)}
                           placeholder="e.g., noun, verb, adjective"
                           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                       </div>
-                      {editMeanings.length > 1 && (
+                      {editor.editMeanings.length > 1 && (
                         <button
-                          onClick={() => handleRemoveMeaning(meaningIdx)}
+                          onClick={() => editor.removeMeaning(meaningIdx)}
                           className="ml-3 p-2 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/20 rounded transition-colors"
                         >
                           ✕
@@ -295,7 +210,7 @@ export function WordDetailModal({ word, onClose, onDelete }: WordDetailModalProp
                             </label>
                             <textarea
                               value={def.definition}
-                              onChange={(e) => handleUpdateDefinition(meaningIdx, defIdx, 'definition', e.target.value)}
+                              onChange={(e) => editor.updateDefinition(meaningIdx, defIdx, 'definition', e.target.value)}
                               placeholder="Enter the definition"
                               rows={2}
                               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
@@ -308,7 +223,7 @@ export function WordDetailModal({ word, onClose, onDelete }: WordDetailModalProp
                             <input
                               type="text"
                               value={def.chineseDefinition || ''}
-                              onChange={(e) => handleUpdateDefinition(meaningIdx, defIdx, 'chineseDefinition', e.target.value)}
+                              onChange={(e) => editor.updateDefinition(meaningIdx, defIdx, 'chineseDefinition', e.target.value)}
                               placeholder="Enter the Chinese definition"
                               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
@@ -320,7 +235,7 @@ export function WordDetailModal({ word, onClose, onDelete }: WordDetailModalProp
                             <input
                               type="text"
                               value={def.example || ''}
-                              onChange={(e) => handleUpdateDefinition(meaningIdx, defIdx, 'example', e.target.value)}
+                              onChange={(e) => editor.updateDefinition(meaningIdx, defIdx, 'example', e.target.value)}
                               placeholder="Enter an example sentence"
                               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
@@ -328,7 +243,7 @@ export function WordDetailModal({ word, onClose, onDelete }: WordDetailModalProp
                           <div className="flex justify-end">
                             {meaning.definitions.length > 1 && (
                               <button
-                                onClick={() => handleRemoveDefinition(meaningIdx, defIdx)}
+                                onClick={() => editor.removeDefinition(meaningIdx, defIdx)}
                                 className="text-xs text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
                               >
                                 Remove Definition
@@ -338,7 +253,7 @@ export function WordDetailModal({ word, onClose, onDelete }: WordDetailModalProp
                         </div>
                       ))}
                       <button
-                        onClick={() => handleAddDefinition(meaningIdx)}
+                        onClick={() => editor.addDefinition(meaningIdx)}
                         className="w-full px-3 py-2 border border-dashed border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-400 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-sm"
                       >
                         + Add Definition
@@ -347,7 +262,7 @@ export function WordDetailModal({ word, onClose, onDelete }: WordDetailModalProp
                   </div>
                 ))}
                 <button
-                  onClick={handleAddMeaning}
+                  onClick={editor.addMeaning}
                   className="w-full px-4 py-3 border border-dashed border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-400 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                 >
                   + Add Meaning
@@ -381,8 +296,8 @@ export function WordDetailModal({ word, onClose, onDelete }: WordDetailModalProp
             <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">Custom Note</h3>
             {isEditing ? (
               <textarea
-                value={editNote}
-                onChange={(e) => setEditNote(e.target.value)}
+                value={editor.editNote}
+                onChange={(e) => editor.setEditNote(e.target.value)}
                 placeholder="Add your notes..."
                 rows={4}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
