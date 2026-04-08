@@ -2,7 +2,7 @@
 
 import { useAuth } from '../context/AuthContext';
 
-type View = 'list' | 'add' | 'review' | 'settings';
+type View = 'list' | 'add' | 'review' | 'settings' | 'ai-memory';
 
 interface NavbarProps {
   currentView: View;
@@ -16,6 +16,7 @@ export function Navbar({ currentView, onViewChange }: NavbarProps) {
     { id: 'list', label: 'Words', icon: '📚' },
     { id: 'add', label: 'Add', icon: '➕' },
     { id: 'review', label: 'Review', icon: '🔄' },
+    { id: 'ai-memory', label: 'AI Memory', icon: '🤖' },
     { id: 'settings', label: 'Settings', icon: '⚙️' },
   ];
 

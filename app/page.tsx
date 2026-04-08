@@ -8,9 +8,10 @@ import { WordList } from './components/WordList';
 import { AddWord } from './components/AddWord';
 import { Review } from './components/Review';
 import { Settings } from './components/Settings';
+import { AIMemory } from './components/AIMemory';
 import { useState } from 'react';
 
-type View = 'list' | 'add' | 'review' | 'settings';
+type View = 'list' | 'add' | 'review' | 'settings' | 'ai-memory';
 
 export default function Home() {
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
@@ -38,6 +39,7 @@ export default function Home() {
         {currentView === 'review' && <Review />}
         {currentView === 'settings' && <Settings />}
       </main>
+      {currentView === 'ai-memory' && <AIMemory onClose={() => setCurrentView('list')} />}
     </div>
   );
 }

@@ -11,16 +11,25 @@ import {
   deleteWordAPI,
   fetchSettings,
   saveSettingsAPI,
+  fetchContexts,
+  addContextAPI,
+  updateContextAPI,
+  deleteContextAPI,
 } from '../services/apiClient';
 
 interface AppContextType {
   words: Word[];
+  contexts: AIContext[];
   settings: AppSettings;
   isLoading: boolean;
   refreshWords: () => Promise<void>;
+  refreshContexts: () => Promise<void>;
   addWord: (word: Word) => Promise<void>;
   updateWord: (word: Word) => Promise<void>;
   deleteWord: (id: string) => Promise<void>;
+  addContext: (context: AIContext) => Promise<void>;
+  updateContext: (context: AIContext) => Promise<void>;
+  deleteContext: (id: string) => Promise<void>;
   saveSettings: (settings: AppSettings) => Promise<void>;
   getStats: () => ReviewStats;
   toggleDarkMode: () => Promise<void>;
@@ -32,6 +41,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export function AppProvider({ children }: { children: ReactNode }) {
   const { user, isAuthenticated } = useAuth();
   const [words, setWords] = useState<Word[]>([]);
+  const [contexts, setContexts] = useState<AIContext[]>([]);
   const [settings, setSettings] = useState<AppSettings>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -44,6 +54,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setWords(allWords);
     } catch (error) {
       console.error('Error refreshing words:', error);
+    }
+  }, [user]);
+
+  const refreshContexts = useCallback(async () => {
+    if (!user) return;
+    try {
+      const allContexts = await fetchContexts(user.id);
+      setContexts(allContexts);
+    } catch (error) {
+      console.error('Error refreshing contexts:', error);
     }
   }, [user]);
 
@@ -79,6 +99,39 @@ export function AppProvider({ children }: { children: ReactNode }) {
       throw error;
     }
   }, [user, refreshWords]);
+
+  const addContext = useCallback(async (context: AIContext) => {
+    if (!user) return;
+    try {
+      await addContextAPI(context, user.id);
+      await refreshContexts();
+    } catch (error) {
+      console.error('Error adding context:', error);
+      throw error;
+    }
+  }, [user, refreshContexts]);
+
+  const updateContext = useCallback(async (context: AIContext) => {
+    if (!user) return;
+    try {
+      await updateContextAPI(context, user.id);
+      await refreshContexts();
+    } catch (error) {
+      console.error('Error updating context:', error);
+      throw error;
+    }
+  }, [user, refreshContexts]);
+
+  const deleteContext = useCallback(async (id: string) => {
+    if (!user) return;
+    try {
+      await deleteContextAPI(id, user.id);
+      await refreshContexts();
+    } catch (error) {
+      console.error('Error deleting context:', error);
+      throw error;
+    }
+  }, [user, refreshContexts]);
 
   const saveSettings = useCallback(async (newSettings: AppSettings) => {
     if (!user) return;
@@ -134,7 +187,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       try {
         setIsLoading(true);
-        await refreshWords();
+        await Promise.all([refreshWords(), refreshContexts()]);
         const savedSettings = await fetchSettings(user.id);
         if (savedSettings) {
           setSettings(savedSettings);
@@ -148,28 +201,38 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
     }
     loadData();
-  }, [isAuthenticated, user, refreshWords]);
+  }, [isAuthenticated, user, refreshWords, refreshContexts]);
 
   const value = useMemo(() => ({
     words,
+    contexts,
     settings,
     isLoading,
     refreshWords,
+    refreshContexts,
     addWord,
     updateWord,
     deleteWord,
+    addContext,
+    updateContext,
+    deleteContext,
     saveSettings,
     getStats,
     toggleDarkMode,
     isDarkMode,
   }), [
     words,
+    contexts,
     settings,
     isLoading,
     refreshWords,
+    refreshContexts,
     addWord,
     updateWord,
     deleteWord,
+    addContext,
+    updateContext,
+    deleteContext,
     saveSettings,
     getStats,
     toggleDarkMode,

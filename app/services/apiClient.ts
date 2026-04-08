@@ -46,6 +46,32 @@ export async function deleteWordAPI(wordId: string, userId: string): Promise<voi
   });
 }
 
+// ========== Contexts API ==========
+
+export async function fetchContexts(userId: string): Promise<AIContext[]> {
+  return fetchAPI(`${API_BASE_URL}/contexts?userId=${userId}`);
+}
+
+export async function addContextAPI(context: AIContext, userId: string): Promise<void> {
+  return fetchAPI(`${API_BASE_URL}/contexts`, {
+    method: 'POST',
+    body: JSON.stringify({ context, userId }),
+  });
+}
+
+export async function updateContextAPI(context: AIContext, userId: string): Promise<void> {
+  return fetchAPI(`${API_BASE_URL}/contexts`, {
+    method: 'PUT',
+    body: JSON.stringify({ context, userId }),
+  });
+}
+
+export async function deleteContextAPI(contextId: string, userId: string): Promise<void> {
+  return fetchAPI(`${API_BASE_URL}/contexts?contextId=${contextId}&userId=${userId}`, {
+    method: 'DELETE',
+  });
+}
+
 // ========== Settings API ==========
 
 export async function fetchSettings(userId: string): Promise<AppSettings | null> {
@@ -57,4 +83,14 @@ export async function saveSettingsAPI(settings: AppSettings, userId: string): Pr
     method: 'PUT',
     body: JSON.stringify({ settings, userId }),
   });
+}
+
+// ========== Generate API ==========
+
+export async function generateContent(prompt: string, wordList?: string[]): Promise<string> {
+  const response = await fetchAPI(`${API_BASE_URL}/generate`, {
+    method: 'POST',
+    body: JSON.stringify({ prompt, wordList }),
+  });
+  return response.content;
 }
