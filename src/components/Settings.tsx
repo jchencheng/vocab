@@ -1,10 +1,9 @@
 import { useState, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
-import { db } from '../services';
 import { DEFAULT_MAX_DAILY_REVIEWS } from '../constants';
 
 export function Settings() {
-  const { settings, saveSettings, words } = useApp();
+  const { settings, saveSettings, words, addWord } = useApp();
   const [maxDailyReviews, setMaxDailyReviews] = useState(settings.maxDailyReviews || DEFAULT_MAX_DAILY_REVIEWS);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -41,7 +40,7 @@ export function Settings() {
       try {
         const importedWords = JSON.parse(e.target?.result as string);
         for (const word of importedWords) {
-          await db.addWord(word);
+          await addWord(word);
         }
         window.location.reload();
       } catch (err) {
@@ -49,7 +48,7 @@ export function Settings() {
       }
     };
     reader.readAsText(file);
-  }, []);
+  }, [addWord]);
 
   return (
     <div className="max-w-3xl mx-auto p-6 animate-fade-in">
@@ -135,8 +134,8 @@ export function Settings() {
         <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">About</h3>
         <div className="text-sm text-gray-600 dark:text-gray-400 space-y-2">
           <p>📖 VocabMaster - Your Personal Vocabulary Book</p>
-          <p>All data is stored locally in your browser using IndexedDB.</p>
-          <p>No data is sent to any server except for the dictionary API and your configured AI API.</p>
+          <p>All data is securely stored in the cloud using Supabase.</p>
+          <p>Your data is synchronized across devices and never lost.</p>
         </div>
       </div>
     </div>
