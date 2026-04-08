@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '../services/supabase';
 
-// 将驼峰式字段名转换为下划线式
+// 将驼峰式字段名转换为下划线式（用于写入数据库）
 function mapWordToDB(word: any) {
   return {
     id: word.id,
@@ -18,6 +18,26 @@ function mapWordToDB(word: any) {
     created_at: word.createdAt || Date.now(),
     updated_at: word.updatedAt || Date.now(),
     quality: word.quality || 0,
+  };
+}
+
+// 将下划线式字段名转换为驼峰式（用于从数据库读取）
+function mapWordFromDB(dbWord: any) {
+  return {
+    id: dbWord.id,
+    word: dbWord.word,
+    phonetic: dbWord.phonetic,
+    phonetics: dbWord.phonetics || [],
+    meanings: dbWord.meanings || [],
+    tags: dbWord.tags || [],
+    customNote: dbWord.custom_note,
+    interval: dbWord.interval || 1,
+    easeFactor: dbWord.ease_factor || 2.5,
+    reviewCount: dbWord.review_count || 0,
+    nextReviewAt: dbWord.next_review_at || Date.now(),
+    createdAt: dbWord.created_at || Date.now(),
+    updatedAt: dbWord.updated_at || Date.now(),
+    quality: dbWord.quality || 0,
   };
 }
 
@@ -42,7 +62,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json(data);
+    // 将数据库字段名转换为前端使用的驼峰式
+    const words = data?.map(mapWordFromDB) || [];
+    return NextResponse.json(words);
   } catch (error: any) {
     console.error('API error:', error);
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
