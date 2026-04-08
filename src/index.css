@@ -12,6 +12,33 @@ body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* 移动端优化 */
+html {
+  touch-action: manipulation;
+}
+
+/* 防止点击高亮 */
+button,
+input,
+textarea,
+select {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 输入框优化 */
+input,
+textarea {
+  font-size: 16px !important;
+}
+
+/* 按钮触摸区域优化 */
+button {
+  min-height: 44px;
+  min-width: 44px;
 }
 
 /* Dark mode styles */

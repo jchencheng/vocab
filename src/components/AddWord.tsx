@@ -406,16 +406,16 @@ function FetchedWordEditor({
   onSave,
 }: FetchedWordEditorProps) {
   return (
-    <div className="bg-white dark:bg-gray-900 dark:border-gray-800 rounded-2xl shadow-lg border border-gray-200 p-6 animate-slide-up">
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <h3 className="text-3xl font-bold text-gray-800 dark:text-white mb-1">Edit Word</h3>
-          <p className="text-lg text-gray-600 dark:text-gray-400">Edit word details or add to vocabulary</p>
+    <div className="bg-white dark:bg-gray-900 dark:border-gray-800 rounded-2xl shadow-lg border border-gray-200 p-4 sm:p-6 animate-slide-up">
+      <div className="flex items-start justify-between mb-4 sm:mb-6">
+        <div className="flex-1">
+          <h3 className="text-2xl sm:text-3xl font-bold text-gray-800 dark:text-white mb-1">Edit Word</h3>
+          <p className="text-base sm:text-lg text-gray-600 dark:text-gray-400">Edit word details or add to vocabulary</p>
         </div>
         {word.phonetics?.some(p => p.audio) && (
           <button
             onClick={onPlayAudio}
-            className="p-3 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full hover:bg-blue-200 dark:hover:bg-blue-800/30 transition-colors"
+            className="ml-2 p-2 sm:p-3 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full hover:bg-blue-200 dark:hover:bg-blue-800/30 transition-colors flex-shrink-0"
           >
             🔊
           </button>
@@ -428,32 +428,32 @@ function FetchedWordEditor({
         </div>
       )}
 
-      <div className="mb-6">
+      <div className="mb-4 sm:mb-6">
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Word</label>
         <input
           type="text"
           value={word.word}
           onChange={(e) => onWordChange(e.target.value)}
-          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3 sm:px-4 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
       </div>
 
-      <div className="mb-6">
+      <div className="mb-4 sm:mb-6">
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Phonetic (optional)</label>
         <input
           type="text"
           value={word.phonetic || ''}
           onChange={(e) => onPhoneticChange(e.target.value)}
           placeholder="e.g., /ˈæp.əl/"
-          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3 sm:px-4 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
       </div>
 
-      <div className="mb-6">
+      <div className="mb-4 sm:mb-6">
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Meanings</label>
         {word.meanings.map((meaning, idx) => (
-          <div key={idx} className="mb-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-            <div className="flex items-center justify-between mb-3">
+          <div key={idx} className="mb-4 p-3 sm:p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
               <div className="flex-1">
                 <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Part of Speech</label>
                 <input
@@ -465,7 +465,7 @@ function FetchedWordEditor({
               </div>
               <button
                 onClick={() => onAddDefinition(idx)}
-                className="ml-3 px-3 py-2 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg text-sm font-medium hover:bg-blue-200 dark:hover:bg-blue-800/30 transition-colors flex items-center"
+                className="w-full sm:w-auto sm:ml-3 px-3 py-2 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg text-sm font-medium hover:bg-blue-200 dark:hover:bg-blue-800/30 transition-colors flex items-center justify-center"
               >
                 + Add Definition
               </button>
@@ -521,29 +521,29 @@ function FetchedWordEditor({
         </button>
       </div>
 
-      <div className="mb-6">
+      <div className="mb-4 sm:mb-6">
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Tags (comma-separated)</label>
         <input
           type="text"
           value={tagsInput}
           onChange={(e) => onTagsChange(e.target.value)}
           placeholder="e.g., TOEFL, business, important"
-          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3 sm:px-4 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
       </div>
 
-      <div className="mb-6">
+      <div className="mb-4 sm:mb-6">
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Custom Note</label>
         <textarea
           value={customNote}
           onChange={(e) => onCustomNoteChange(e.target.value)}
           placeholder="Add your own notes about this word..."
           rows={3}
-          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+          className="w-full px-3 sm:px-4 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
         />
       </div>
 
-      <div className="flex gap-3">
+      <div className="flex flex-col sm:flex-row gap-3">
         <button
           onClick={onCancel}
           className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 dark:bg-gray-900 rounded-xl font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
@@ -606,11 +606,11 @@ function ManualWordEditor({
   isSaveDisabled,
 }: ManualWordEditorProps) {
   return (
-    <div className="bg-white dark:bg-gray-900 dark:border-gray-800 rounded-2xl shadow-lg border border-gray-200 p-6 animate-slide-up">
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <h3 className="text-3xl font-bold text-gray-800 dark:text-white mb-1">Edit Word</h3>
-          <p className="text-lg text-gray-600 dark:text-gray-400">Edit word details manually or click Search to get definitions</p>
+    <div className="bg-white dark:bg-gray-900 dark:border-gray-800 rounded-2xl shadow-lg border border-gray-200 p-4 sm:p-6 animate-slide-up">
+      <div className="flex items-start justify-between mb-4 sm:mb-6">
+        <div className="flex-1">
+          <h3 className="text-2xl sm:text-3xl font-bold text-gray-800 dark:text-white mb-1">Edit Word</h3>
+          <p className="text-base sm:text-lg text-gray-600 dark:text-gray-400">Edit word details manually or click Search to get definitions</p>
         </div>
       </div>
 
@@ -620,33 +620,33 @@ function ManualWordEditor({
         </div>
       )}
 
-      <div className="mb-6">
+      <div className="mb-4 sm:mb-6">
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Word</label>
         <input
           type="text"
           value={word}
           onChange={(e) => onWordChange(e.target.value)}
           placeholder="Enter the word"
-          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3 sm:px-4 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
       </div>
 
-      <div className="mb-6">
+      <div className="mb-4 sm:mb-6">
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Phonetic (optional)</label>
         <input
           type="text"
           value={phonetic}
           onChange={(e) => onPhoneticChange(e.target.value)}
           placeholder="e.g., /ˈæp.əl/"
-          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3 sm:px-4 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
       </div>
 
-      <div className="mb-6">
+      <div className="mb-4 sm:mb-6">
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Meanings</label>
         {meanings.map((meaning, meaningIndex) => (
-          <div key={meaningIndex} className="mb-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-            <div className="flex items-center justify-between mb-3">
+          <div key={meaningIndex} className="mb-4 p-3 sm:p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
               <div className="flex-1">
                 <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Part of Speech</label>
                 <input
@@ -659,7 +659,7 @@ function ManualWordEditor({
               {meanings.length > 1 && (
                 <button
                   onClick={() => onRemoveMeaning(meaningIndex)}
-                  className="ml-3 p-2 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/20 rounded transition-colors"
+                  className="w-full sm:w-auto sm:ml-3 p-2 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/20 rounded transition-colors"
                 >
                   ✕
                 </button>
@@ -719,35 +719,35 @@ function ManualWordEditor({
         ))}
         <button
           onClick={onAddMeaning}
-          className="w-full px-4 py-3 border border-dashed border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-400 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+          className="w-full px-4 py-2 sm:py-3 border border-dashed border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-400 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
         >
           + Add Part of Speech
         </button>
       </div>
 
-      <div className="mb-6">
+      <div className="mb-4 sm:mb-6">
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Tags (comma-separated)</label>
         <input
           type="text"
           value={tagsInput}
           onChange={(e) => onTagsChange(e.target.value)}
           placeholder="e.g., TOEFL, business, important"
-          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3 sm:px-4 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
       </div>
 
-      <div className="mb-6">
+      <div className="mb-4 sm:mb-6">
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Custom Note</label>
         <textarea
           value={customNote}
           onChange={(e) => onCustomNoteChange(e.target.value)}
           placeholder="Add your own notes about this word..."
           rows={3}
-          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+          className="w-full px-3 sm:px-4 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
         />
       </div>
 
-      <div className="flex gap-3">
+      <div className="flex flex-col sm:flex-row gap-3">
         <button
           onClick={onCancel}
           className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 dark:bg-gray-900 rounded-xl font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"

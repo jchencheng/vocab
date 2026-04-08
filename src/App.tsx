@@ -25,7 +25,7 @@ function AppContent() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 dark:text-gray-200">
       <Navbar activeTab={activeTab} onTabChange={setActiveTab} />
-      <main>
+      <main className="pb-4 sm:pb-8">
         {activeTab === 'add' && <AddWord />}
         {activeTab === 'words' && <WordList />}
         {activeTab === 'review' && <Review />}

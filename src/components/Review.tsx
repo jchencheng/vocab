@@ -136,13 +136,13 @@ export function Review() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto p-6 animate-fade-in">
-      <div className="text-center mb-8">
-        <h2 className="text-3xl font-bold text-gray-800 dark:text-white mb-2">Review</h2>
-        <p className="text-gray-600 dark:text-gray-400">
+    <div className="max-w-3xl mx-auto p-3 sm:p-6 animate-fade-in">
+      <div className="text-center mb-6 sm:mb-8">
+        <h2 className="text-2xl sm:text-3xl font-bold text-gray-800 dark:text-white mb-2">Review</h2>
+        <p className="text-base sm:text-lg text-gray-600 dark:text-gray-400">
           {currentIndex + 1} of {todayQueue.length}
           {postponedWords.length > 0 && (
-            <span className="text-sm text-gray-500 dark:text-gray-500 ml-2">
+            <span className="block sm:inline text-xs sm:text-sm text-gray-500 dark:text-gray-500 sm:ml-2">
               (+{postponedWords.length} scheduled)
             </span>
           )}
@@ -155,10 +155,10 @@ export function Review() {
         </div>
       </div>
 
-      <div className="flex justify-center gap-2 mb-8">
+      <div className="flex flex-col sm:flex-row justify-center gap-2 mb-6 sm:mb-8">
         <button
           onClick={() => setReviewMode('en2zh')}
-          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+          className={`px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
             reviewMode === 'en2zh'
               ? 'bg-blue-600 text-white'
               : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
@@ -168,7 +168,7 @@ export function Review() {
         </button>
         <button
           onClick={() => setReviewMode('zh2en')}
-          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+          className={`px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
             reviewMode === 'zh2en'
               ? 'bg-purple-600 text-white'
               : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
@@ -178,29 +178,29 @@ export function Review() {
         </button>
       </div>
 
-      <div className="bg-white dark:bg-gray-900 dark:border-gray-800 rounded-2xl shadow-lg border border-gray-200 p-8 mb-6">
+      <div className="bg-white dark:bg-gray-900 dark:border-gray-800 rounded-2xl shadow-lg border border-gray-200 p-4 sm:p-8 mb-4 sm:mb-6">
         <div className="text-center">
           <div className="mb-4">
             {reviewMode === 'en2zh' ? (
               <div>
-                <div className="flex items-center justify-center gap-3 mb-2">
-                  <h3 className="text-4xl font-bold text-gray-800 dark:text-white">{currentWord.word}</h3>
+                <div className="flex items-center justify-center gap-2 sm:gap-3 mb-2">
+                  <h3 className="text-2xl sm:text-4xl font-bold text-gray-800 dark:text-white">{currentWord.word}</h3>
                   {hasAudio(currentWord.phonetics) && (
                     <button
                       onClick={handlePlayAudio}
-                      className="p-2 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full hover:bg-blue-200 dark:hover:bg-blue-800/30 transition-colors"
+                      className="p-1.5 sm:p-2 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full hover:bg-blue-200 dark:hover:bg-blue-800/30 transition-colors"
                     >
                       🔊
                     </button>
                   )}
                 </div>
                 {currentWord.phonetic && (
-                  <p className="text-xl text-gray-600 dark:text-gray-400">{currentWord.phonetic}</p>
+                  <p className="text-base sm:text-xl text-gray-600 dark:text-gray-400">{currentWord.phonetic}</p>
                 )}
               </div>
             ) : (
               <div>
-                <p className="text-2xl text-gray-800 dark:text-white">{getChineseDefinition(currentWord)}</p>
+                <p className="text-lg sm:text-2xl text-gray-800 dark:text-white">{getChineseDefinition(currentWord)}</p>
               </div>
             )}
           </div>
@@ -208,7 +208,7 @@ export function Review() {
           {!showAnswer ? (
             <button
               onClick={() => setShowAnswer(true)}
-              className="px-8 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-medium hover:opacity-90 transition-opacity text-lg"
+              className="w-full sm:w-auto px-6 sm:px-8 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-medium hover:opacity-90 transition-opacity text-base sm:text-lg"
             >
               Show Answer
             </button>
@@ -217,37 +217,37 @@ export function Review() {
               <div className="mb-6">
                 {reviewMode === 'en2zh' ? (
                   <div>
-                    <h4 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-3">Meaning</h4>
-                    <p className="text-xl text-gray-800 dark:text-white">{getChineseDefinition(currentWord)}</p>
+                    <h4 className="text-base sm:text-lg font-semibold text-gray-700 dark:text-gray-300 mb-3">Meaning</h4>
+                    <p className="text-lg sm:text-xl text-gray-800 dark:text-white">{getChineseDefinition(currentWord)}</p>
                   </div>
                 ) : (
                   <div>
-                    <div className="flex items-center justify-center gap-3 mb-2">
-                      <h3 className="text-4xl font-bold text-gray-800 dark:text-white">{currentWord.word}</h3>
+                    <div className="flex items-center justify-center gap-2 sm:gap-3 mb-2">
+                      <h3 className="text-2xl sm:text-4xl font-bold text-gray-800 dark:text-white">{currentWord.word}</h3>
                       {hasAudio(currentWord.phonetics) && (
                         <button
                           onClick={handlePlayAudio}
-                          className="p-2 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full hover:bg-blue-200 dark:hover:bg-blue-800/30 transition-colors"
+                          className="p-1.5 sm:p-2 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full hover:bg-blue-200 dark:hover:bg-blue-800/30 transition-colors"
                         >
                           🔊
                         </button>
                       )}
                     </div>
                     {currentWord.phonetic && (
-                      <p className="text-xl text-gray-600 dark:text-gray-400">{currentWord.phonetic}</p>
+                      <p className="text-base sm:text-xl text-gray-600 dark:text-gray-400">{currentWord.phonetic}</p>
                     )}
                   </div>
                 )}
               </div>
 
-              <div className="mb-6">
-                <h4 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-3">How well did you remember?</h4>
-                <div className="grid grid-cols-6 gap-2">
+              <div className="mb-4 sm:mb-6">
+                <h4 className="text-base sm:text-lg font-semibold text-gray-700 dark:text-gray-300 mb-3">How well did you remember?</h4>
+                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
                   {[0, 1, 2, 3, 4, 5].map((q) => (
                     <button
                       key={q}
                       onClick={() => handleQuality(q)}
-                      className={`py-3 rounded-lg font-medium transition-all ${
+                      className={`py-2.5 sm:py-3 rounded-lg text-sm sm:text-base font-medium transition-all ${
                         q < 3
                           ? 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-800/30'
                           : 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-800/30'
@@ -257,7 +257,7 @@ export function Review() {
                     </button>
                   ))}
                 </div>
-                <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-2">
+                <div className="flex flex-col sm:flex-row justify-between text-xs text-gray-500 dark:text-gray-400 mt-2 gap-1">
                   <span>Complete blackout</span>
                   <span>Perfect recall</span>
                 </div>
