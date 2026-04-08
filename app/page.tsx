@@ -1,15 +1,43 @@
+'use client';
+
+import { useAuth } from './context/AuthContext';
+import { useApp } from './context/AppContext';
+import { Login } from './components/Login';
+import { Navbar } from './components/Navbar';
+import { WordList } from './components/WordList';
+import { AddWord } from './components/AddWord';
+import { Review } from './components/Review';
+import { Settings } from './components/Settings';
+import { useState } from 'react';
+
+type View = 'list' | 'add' | 'review' | 'settings';
+
 export default function Home() {
-  return (
-    <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-purple-50 p-4">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold text-gray-800 mb-4">Vocab Master</h1>
-        <p className="text-gray-600 mb-8">Migrating to Next.js...</p>
-        <div className="animate-pulse text-blue-600">
-          <svg className="w-12 h-12 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-        </div>
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  const { isLoading: isAppLoading } = useApp();
+  const [currentView, setCurrentView] = useState<View>('list');
+
+  if (isAuthLoading || isAppLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-purple-50 dark:from-gray-900 dark:to-gray-800">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
       </div>
-    </main>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Login />;
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <Navbar currentView={currentView} onViewChange={setCurrentView} />
+      <main className="container mx-auto px-4 py-6">
+        {currentView === 'list' && <WordList />}
+        {currentView === 'add' && <AddWord />}
+        {currentView === 'review' && <Review />}
+        {currentView === 'settings' && <Settings />}
+      </main>
+    </div>
   );
 }
