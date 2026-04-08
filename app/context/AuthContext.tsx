@@ -23,7 +23,7 @@ const getSiteUrl = () => {
   if (typeof window !== 'undefined') {
     return window.location.origin;
   }
-  return 'https://vocab-lyart-seven.vercel.app';
+  return 'https://vocab-ook.vercel.app';
 };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
