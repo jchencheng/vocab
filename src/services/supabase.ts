@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import type { Word, AIContext, AppSettings, AppUser } from '../types';
+import type { Word, AIContext, AppSettings } from '../types';
 
 const SUPABASE_URL = 'https://bmvtpdofmnbrymosrwhy.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_0FkwKPJWq7-e3SZxbbdlMA_35Yd19Ft';
@@ -14,14 +14,6 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
 });
 
 // 类型定义
-export interface SupabaseUser {
-  id: string;
-  email: string;
-  password_hash: string;
-  created_at: number;
-  updated_at: number;
-}
-
 export interface SupabaseWord {
   id: string;
   user_id: string;
@@ -54,28 +46,6 @@ export interface SupabaseSettings {
   max_daily_reviews: number;
   dark_mode: boolean;
   updated_at: number;
-}
-
-// 转换函数：AppUser -> SupabaseUser
-export function toSupabaseUser(user: AppUser): SupabaseUser {
-  return {
-    id: user.id,
-    email: user.email,
-    password_hash: user.passwordHash,
-    created_at: user.createdAt,
-    updated_at: user.updatedAt,
-  };
-}
-
-// 转换函数：SupabaseUser -> AppUser
-export function fromSupabaseUser(data: SupabaseUser): AppUser {
-  return {
-    id: data.id,
-    email: data.email,
-    passwordHash: data.password_hash,
-    createdAt: data.created_at,
-    updatedAt: data.updated_at,
-  };
 }
 
 // 转换函数：Word -> SupabaseWord
