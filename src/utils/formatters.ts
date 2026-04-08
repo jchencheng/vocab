@@ -78,27 +78,42 @@ export function applyBionicReading(text: string): string {
 export function formatWithBionicReading(text: string): Array<{ type: 'bionic' | 'normal'; content: string }> {
   const parts: Array<{ type: 'bionic' | 'normal'; content: string }> = [];
   
-  // 正则匹配：英文单词序列或中文/标点/数字序列
-  const regex = /([a-zA-Z]+(?:[''-][a-zA-Z]+)*\s*)+|([^a-zA-Z]+)/g;
-  let match;
+  // 使用更简单的方法：逐个字符扫描
+  let currentPart = '';
+  let isCurrentEnglish = false;
   
-  while ((match = regex.exec(text)) !== null) {
-    const englishPart = match[1];
-    const nonEnglishPart = match[2];
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    // 检查字符是否是英文字母、连字符或撇号
+    const isEnglish = /[a-zA-Z'\-]/.test(char);
     
-    if (englishPart && englishPart.trim()) {
-      // 英文部分应用 Bionic Reading
-      parts.push({
-        type: 'bionic',
-        content: applyBionicReading(englishPart)
-      });
-    } else if (nonEnglishPart) {
-      // 中文、标点、数字等保持不变
-      parts.push({
-        type: 'normal',
-        content: nonEnglishPart
-      });
+    if (i === 0) {
+      // 第一个字符
+      currentPart = char;
+      isCurrentEnglish = isEnglish;
+    } else if (isEnglish === isCurrentEnglish) {
+      // 同类型字符，继续累积
+      currentPart += char;
+    } else {
+      // 类型变化，保存当前部分
+      if (currentPart) {
+        parts.push({
+          type: isCurrentEnglish ? 'bionic' : 'normal',
+          content: isCurrentEnglish ? applyBionicReading(currentPart) : currentPart
+        });
+      }
+      // 开始新部分
+      currentPart = char;
+      isCurrentEnglish = isEnglish;
     }
+  }
+  
+  // 保存最后一部分
+  if (currentPart) {
+    parts.push({
+      type: isCurrentEnglish ? 'bionic' : 'normal',
+      content: isCurrentEnglish ? applyBionicReading(currentPart) : currentPart
+    });
   }
   
   return parts;
