@@ -19,6 +19,13 @@ export function Review() {
     return getTodayReviewQueue(words, maxDailyReviews);
   }, [words, maxDailyReviews]);
 
+  // 当今日队列变化时，重置当前索引
+  useEffect(() => {
+    setCurrentIndex(0);
+    setShowAnswer(false);
+    setIsComplete(false);
+  }, [todayQueue.length]);
+
   // 组件加载时，自动推迟超出限制的单词（使用优先级分散策略）
   useEffect(() => {
     async function postponeExtraWords() {
@@ -113,6 +120,7 @@ export function Review() {
     );
   }
 
+  // 如果 currentWord 不存在，可能是正在推迟单词或数据加载中
   if (!currentWord) {
     return (
       <div className="max-w-2xl mx-auto p-6 animate-fade-in">
@@ -120,7 +128,7 @@ export function Review() {
           <div className="text-8xl mb-6">🔄</div>
           <h2 className="text-3xl font-bold text-gray-800 dark:text-white mb-4">Loading...</h2>
           <p className="text-xl text-gray-600 dark:text-gray-400 mb-8">
-            Preparing your review session
+            {isPostponing ? 'Scheduling words for future days...' : 'Preparing your review session'}
           </p>
         </div>
       </div>
