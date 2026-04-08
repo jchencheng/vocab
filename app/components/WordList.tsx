@@ -1,9 +1,13 @@
 'use client';
 
+import { useState } from 'react';
 import { useApp } from '../context/AppContext';
+import { WordDetailModal } from './WordDetailModal';
+import type { Word } from '../types';
 
 export function WordList() {
-  const { words, isLoading } = useApp();
+  const { words, isLoading, deleteWord } = useApp();
+  const [selectedWord, setSelectedWord] = useState<Word | null>(null);
 
   if (isLoading) {
     return (
@@ -27,7 +31,7 @@ export function WordList() {
             No words yet. Start building your vocabulary!
           </p>
           <p className="text-gray-400 dark:text-gray-500">
-            Click "Add" to add your first word.
+            Click &quot;Add&quot; to add your first word.
           </p>
         </div>
       ) : (
@@ -35,7 +39,8 @@ export function WordList() {
           {words.map((word) => (
             <div
               key={word.id}
-              className="bg-white dark:bg-gray-900 rounded-xl shadow-md border border-gray-200 dark:border-gray-800 p-6 hover:shadow-lg transition-shadow"
+              onClick={() => setSelectedWord(word)}
+              className="bg-white dark:bg-gray-900 rounded-xl shadow-md border border-gray-200 dark:border-gray-800 p-6 hover:shadow-lg transition-shadow cursor-pointer"
             >
               <div className="flex items-start justify-between">
                 <div>
@@ -70,6 +75,14 @@ export function WordList() {
             </div>
           ))}
         </div>
+      )}
+
+      {selectedWord && (
+        <WordDetailModal
+          word={selectedWord}
+          onClose={() => setSelectedWord(null)}
+          onDelete={deleteWord}
+        />
       )}
     </div>
   );
