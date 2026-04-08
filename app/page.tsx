@@ -20,8 +20,8 @@ export default function Home() {
 
   if (isAuthLoading || isAppLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-purple-50 dark:from-gray-900 dark:to-gray-800">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-14 w-14 border-4 border-primary-200 border-t-primary-600"></div>
       </div>
     );
   }
@@ -31,14 +31,16 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen">
       <Navbar currentView={currentView} onViewChange={setCurrentView} />
-      <main className="container mx-auto px-4 py-6">
-        {currentView === 'list' && <WordList />}
-        {currentView === 'add' && <AddWord />}
-        {currentView === 'review' && <Review />}
-        {currentView === 'settings' && <Settings />}
-        {currentView === 'ai-memory' && <AIMemory onClose={() => setCurrentView('list')} />}
+      <main className="container mx-auto px-4 py-8">
+        <div className="animate-fade-in">
+          {currentView === 'list' && <WordList />}
+          {currentView === 'add' && <AddWord />}
+          {currentView === 'review' && <Review />}
+          {currentView === 'settings' && <Settings />}
+          {currentView === 'ai-memory' && <AIMemory />}
+        </div>
       </main>
     </div>
   );

@@ -37,7 +37,6 @@ export function AddWord() {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
 
-  // Form state
   const [editWord, setEditWord] = useState('');
   const [editPhonetic, setEditPhonetic] = useState('');
   const [editMeanings, setEditMeanings] = useState<Meaning[]>(emptyWord.meanings);
@@ -72,7 +71,6 @@ Include at least 2 meanings with different parts of speech if applicable.`;
 
       const content = await generateContent(prompt);
 
-      // Try to extract JSON from response
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const wordData = JSON.parse(jsonMatch[0]);
@@ -122,7 +120,6 @@ Include at least 2 meanings with different parts of speech if applicable.`;
       await addWord(newWord);
       setSuccess(true);
 
-      // Reset form
       setCurrentWord({ ...emptyWord, id: crypto.randomUUID() });
       setEditWord('');
       setEditPhonetic('');
@@ -203,15 +200,17 @@ Include at least 2 meanings with different parts of speech if applicable.`;
   }, []);
 
   return (
-    <div className="max-w-2xl mx-auto animate-fade-in">
+    <div className="max-w-3xl mx-auto animate-fade-in">
       {success && (
-        <div className="mb-4 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl text-green-600 dark:text-green-400">
+        <div className="mb-6 p-4 bg-accent-50 dark:bg-accent-900/20 border border-accent-200 dark:border-accent-800/50 rounded-2xl text-accent-600 dark:text-accent-400 flex items-center gap-2">
+          <span>✓</span>
           Word added successfully!
         </div>
       )}
 
       {error && (
-        <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-red-600 dark:text-red-400">
+        <div className="mb-6 p-4 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800/50 rounded-2xl text-rose-600 dark:text-rose-400 flex items-center gap-2">
+          <span>⚠️</span>
           {error}
         </div>
       )}

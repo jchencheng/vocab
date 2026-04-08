@@ -55,80 +55,91 @@ export function Settings() {
   }, [addWord]);
 
   return (
-    <div className="max-w-3xl mx-auto p-6 animate-fade-in">
-      <div className="text-center mb-8">
-        <h2 className="text-3xl font-bold text-gray-800 dark:text-white mb-2">Settings</h2>
-        <p className="text-gray-600 dark:text-gray-400">Configure your preferences and manage data</p>
+    <div className="max-w-3xl mx-auto animate-fade-in">
+      <div className="text-center mb-10">
+        <h2 className="font-display text-3xl font-bold text-slate-900 dark:text-white mb-3">Settings</h2>
+        <p className="text-slate-600 dark:text-slate-400 text-lg">Configure your preferences and manage data</p>
       </div>
 
-      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-800 p-6 mb-6">
-        <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Review Settings</h3>
-        
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Maximum Daily Reviews
-          </label>
-          <input
-            type="number"
-            min="1"
-            max="200"
-            value={maxDailyReviews}
-            onChange={(e) => setMaxDailyReviews(parseInt(e.target.value) || 50)}
-            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            Maximum number of words to review per day
-          </p>
-        </div>
-
-        {saveSuccess && (
-          <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl text-green-600 dark:text-green-400 text-sm">
-            Settings saved successfully!
-          </div>
-        )}
-
-        <button
-          onClick={handleSave}
-          disabled={isSaving}
-          className="w-full py-2 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
-        >
-          {isSaving ? 'Saving...' : 'Save Settings'}
-        </button>
-      </div>
-
-      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-800 p-6 mb-6">
-        <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Data Management</h3>
-        
-        <div className="space-y-4">
-          <div>
-            <button
-              onClick={handleExport}
-              className="w-full py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl font-medium hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-            >
-              Export Data (JSON)
-            </button>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Import Data
+      <div className="space-y-6">
+        <div className="bg-white dark:bg-slate-800/80 backdrop-blur-xl rounded-3xl shadow-medium border border-slate-200/50 dark:border-slate-700/50 p-8">
+          <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-6">Review Settings</h3>
+          
+          <div className="mb-6">
+            <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
+              Maximum Daily Reviews
             </label>
             <input
-              type="file"
-              accept=".json"
-              onChange={(e) => e.target.files?.[0] && handleImport(e.target.files[0])}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+              type="number"
+              min="1"
+              max="200"
+              value={maxDailyReviews}
+              onChange={(e) => setMaxDailyReviews(parseInt(e.target.value) || 50)}
+              className="w-full px-5 py-3.5 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 dark:text-white rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
             />
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">
+              Maximum number of words to review per day
+            </p>
+          </div>
+
+          {saveSuccess && (
+            <div className="mb-6 p-4 bg-accent-50 dark:bg-accent-900/20 border border-accent-200 dark:border-accent-800/50 rounded-2xl text-accent-600 dark:text-accent-400 text-sm flex items-center gap-2">
+              <span>✓</span>
+              Settings saved successfully!
+            </div>
+          )}
+
+          <button
+            onClick={handleSave}
+            disabled={isSaving}
+            className="w-full py-4 bg-gradient-to-r from-primary-600 to-accent-600 text-white rounded-2xl font-semibold hover:opacity-90 disabled:opacity-50 transition-all shadow-soft hover:shadow-medium active:scale-[0.98]"
+          >
+            {isSaving ? (
+              <span className="flex items-center justify-center gap-2">
+                <span className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full" />
+                Saving...
+              </span>
+            ) : 'Save Settings'}
+          </button>
+        </div>
+
+        <div className="bg-white dark:bg-slate-800/80 backdrop-blur-xl rounded-3xl shadow-medium border border-slate-200/50 dark:border-slate-700/50 p-8">
+          <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-6">Data Management</h3>
+          
+          <div className="space-y-4">
+            <div>
+              <button
+                onClick={handleExport}
+                className="w-full py-4 bg-slate-100 dark:bg-slate-700/50 text-slate-700 dark:text-slate-300 rounded-2xl font-semibold hover:bg-slate-200 dark:hover:bg-slate-700 transition-all shadow-soft"
+              >
+                Export Data (JSON)
+              </button>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
+                Import Data
+              </label>
+              <input
+                type="file"
+                accept=".json"
+                onChange={(e) => e.target.files?.[0] && handleImport(e.target.files[0])}
+                className="w-full px-5 py-3.5 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 dark:text-white rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+              />
+            </div>
           </div>
         </div>
-      </div>
 
-      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-800 p-6">
-        <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">About</h3>
-        <div className="text-sm text-gray-600 dark:text-gray-400 space-y-2">
-          <p>📖 VocabMaster - Your Personal Vocabulary Book</p>
-          <p>All data is securely stored in the cloud using Supabase.</p>
-          <p>Your data is synchronized across devices and never lost.</p>
+        <div className="bg-white dark:bg-slate-800/80 backdrop-blur-xl rounded-3xl shadow-medium border border-slate-200/50 dark:border-slate-700/50 p-8">
+          <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-6">About</h3>
+          <div className="text-slate-600 dark:text-slate-400 space-y-3">
+            <p className="flex items-center gap-2">
+              <span>📖</span>
+              <span className="font-medium">VocabMaster - Your Personal Vocabulary Book</span>
+            </p>
+            <p>All data is securely stored in the cloud using Supabase.</p>
+            <p>Your data is synchronized across devices and never lost.</p>
+          </div>
         </div>
       </div>
     </div>

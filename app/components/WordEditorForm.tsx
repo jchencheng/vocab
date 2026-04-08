@@ -58,17 +58,17 @@ export function WordEditorForm({
   subtitle,
 }: WordEditorFormProps) {
   return (
-    <div className="bg-white dark:bg-gray-900 dark:border-gray-800 rounded-2xl shadow-lg border border-gray-200 p-4 sm:p-6 animate-slide-up">
+    <div className="bg-white dark:bg-slate-800/80 backdrop-blur-xl rounded-3xl shadow-medium border border-slate-200/50 dark:border-slate-700/50 p-6 sm:p-8 animate-slide-up">
       {(title || subtitle) && (
-        <div className="flex items-start justify-between mb-4 sm:mb-6">
+        <div className="flex items-start justify-between mb-6 sm:mb-8">
           <div className="flex-1">
-            {title && <h3 className="text-2xl sm:text-3xl font-bold text-gray-800 dark:text-white mb-1">{title}</h3>}
-            {subtitle && <p className="text-base sm:text-lg text-gray-600 dark:text-gray-400">{subtitle}</p>}
+            {title && <h3 className="font-display text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-2">{title}</h3>}
+            {subtitle && <p className="text-base sm:text-lg text-slate-600 dark:text-slate-400">{subtitle}</p>}
           </div>
           {onPlayAudio && (
             <button
               onClick={onPlayAudio}
-              className="ml-2 p-2 sm:p-3 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full hover:bg-blue-200 dark:hover:bg-blue-800/30 transition-colors flex-shrink-0"
+              className="ml-3 p-3 bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 rounded-2xl hover:bg-primary-200 dark:hover:bg-primary-800/30 transition-colors flex-shrink-0 shadow-soft"
             >
               🔊
             </button>
@@ -76,62 +76,63 @@ export function WordEditorForm({
         </div>
       )}
 
-      <div className="space-y-4">
+      <div className="space-y-5">
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Word</label>
-          <div className="flex gap-2">
+          <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Word</label>
+          <div className="flex gap-3">
             <input
               type="text"
               value={word}
               onChange={(e) => onWordChange(e.target.value)}
-              className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="flex-1 px-4 py-3.5 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 dark:text-white rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all placeholder:text-slate-400"
             />
             {showGetDefinitions && onGetDefinitions && (
               <button
                 onClick={onGetDefinitions}
                 disabled={isLoading || !word.trim()}
-                className="px-3 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity whitespace-nowrap"
+                className="px-5 py-3.5 bg-gradient-to-r from-primary-600 to-accent-600 text-white rounded-2xl font-semibold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-soft whitespace-nowrap"
               >
                 {isLoading ? 'Getting...' : 'Get Definitions'}
               </button>
             )}
           </div>
           {error && (
-            <div className="mt-2 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-600 dark:text-red-400 text-sm">
+            <div className="mt-3 p-3 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800/50 rounded-2xl text-rose-600 dark:text-rose-400 text-sm flex items-center gap-2">
+              <span>⚠️</span>
               {error}
             </div>
           )}
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Phonetic</label>
+          <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Phonetic</label>
           <input
             type="text"
             value={phonetic}
             onChange={(e) => onPhoneticChange(e.target.value)}
             placeholder="e.g., /ˈæp.əl/"
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-4 py-3.5 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 dark:text-white rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all placeholder:text-slate-400"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tags (comma-separated)</label>
+          <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Tags (comma-separated)</label>
           <input
             type="text"
             value={tags}
             onChange={(e) => onTagsChange(e.target.value)}
             placeholder="e.g., TOEFL, business, important"
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-4 py-3.5 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 dark:text-white rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all placeholder:text-slate-400"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Meanings</label>
+          <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Meanings</label>
           {meanings.map((meaning, meaningIdx) => (
-            <div key={meaningIdx} className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 mb-4">
-              <div className="flex items-center justify-between mb-3">
+            <div key={meaningIdx} className="bg-slate-50 dark:bg-slate-700/50 rounded-2xl p-5 mb-5 border border-slate-200/50 dark:border-slate-600/50">
+              <div className="flex items-center justify-between mb-4">
                 <div className="flex-1">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
                     Part of Speech
                   </label>
                   <input
@@ -139,23 +140,23 @@ export function WordEditorForm({
                     value={meaning.partOfSpeech}
                     onChange={(e) => onUpdateMeaning(meaningIdx, 'partOfSpeech', e.target.value)}
                     placeholder="e.g., noun, verb, adjective"
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 dark:text-white rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
                   />
                 </div>
                 {onRemoveMeaning && meanings.length > 1 && (
                   <button
                     onClick={() => onRemoveMeaning(meaningIdx)}
-                    className="ml-3 p-2 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/20 rounded transition-colors"
+                    className="ml-4 p-2.5 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/20 rounded-xl transition-colors"
                   >
                     ✕
                   </button>
                 )}
               </div>
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {meaning.definitions.map((def, defIdx) => (
-                  <div key={defIdx} className="border border-gray-200 dark:border-gray-700 rounded-lg p-3">
-                    <div className="mb-2">
-                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                  <div key={defIdx} className="border border-slate-200 dark:border-slate-600 rounded-xl p-4 bg-white dark:bg-slate-800">
+                    <div className="mb-3">
+                      <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
                         Definition {defIdx + 1}
                       </label>
                       <textarea
@@ -163,11 +164,11 @@ export function WordEditorForm({
                         onChange={(e) => onUpdateDefinition(meaningIdx, defIdx, 'definition', e.target.value)}
                         placeholder="Enter the definition"
                         rows={2}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                        className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-600 dark:text-white rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all resize-none"
                       />
                     </div>
-                    <div className="mb-2">
-                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                    <div className="mb-3">
+                      <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
                         Chinese Definition
                       </label>
                       <input
@@ -175,11 +176,11 @@ export function WordEditorForm({
                         value={def.chineseDefinition || ''}
                         onChange={(e) => onUpdateDefinition(meaningIdx, defIdx, 'chineseDefinition', e.target.value)}
                         placeholder="Enter the Chinese definition"
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-600 dark:text-white rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
                       />
                     </div>
-                    <div className="mb-2">
-                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                    <div className="mb-3">
+                      <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
                         Example
                       </label>
                       <input
@@ -187,14 +188,14 @@ export function WordEditorForm({
                         value={def.example || ''}
                         onChange={(e) => onUpdateDefinition(meaningIdx, defIdx, 'example', e.target.value)}
                         placeholder="Enter an example sentence"
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-600 dark:text-white rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
                       />
                     </div>
                     <div className="flex justify-end">
                       {meaning.definitions.length > 1 && (
                         <button
                           onClick={() => onRemoveDefinition(meaningIdx, defIdx)}
-                          className="text-xs text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
+                          className="text-xs text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300 font-medium"
                         >
                           Remove Definition
                         </button>
@@ -204,7 +205,7 @@ export function WordEditorForm({
                 ))}
                 <button
                   onClick={() => onAddDefinition(meaningIdx)}
-                  className="w-full px-3 py-2 border border-dashed border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-400 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-sm"
+                  className="w-full px-4 py-3 border-2 border-dashed border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-400 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors text-sm font-medium"
                 >
                   + Add Definition
                 </button>
@@ -213,30 +214,30 @@ export function WordEditorForm({
           ))}
           <button
             onClick={onAddMeaning}
-            className="w-full px-4 py-3 border border-dashed border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-400 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+            className="w-full px-5 py-4 border-2 border-dashed border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-400 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors font-medium"
           >
             + Add Meaning
           </button>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Custom Note</label>
+          <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Custom Note</label>
           <textarea
             value={note}
             onChange={(e) => onNoteChange(e.target.value)}
             placeholder="Add your notes..."
             rows={4}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+            className="w-full px-4 py-3.5 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 dark:text-white rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all resize-none"
           />
         </div>
       </div>
 
       {(onCancel || onSave) && (
-        <div className="flex flex-col sm:flex-row gap-3 mt-6">
+        <div className="flex flex-col sm:flex-row gap-4 mt-8">
           {onCancel && (
             <button
               onClick={onCancel}
-              className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 dark:bg-gray-900 rounded-xl font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              className="flex-1 px-6 py-4 border-2 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-2xl font-semibold hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-all shadow-soft"
             >
               Cancel
             </button>
@@ -245,7 +246,7 @@ export function WordEditorForm({
             <button
               onClick={onSave}
               disabled={isSaveDisabled}
-              className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
+              className="flex-1 px-6 py-4 bg-gradient-to-r from-primary-600 to-accent-600 text-white rounded-2xl font-semibold hover:opacity-90 disabled:opacity-50 transition-all shadow-soft hover:shadow-medium active:scale-[0.98]"
             >
               Add to Vocabulary
             </button>

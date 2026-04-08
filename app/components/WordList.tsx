@@ -21,105 +21,125 @@ export function WordList() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      <div className="flex items-center justify-center py-20">
+        <div className="animate-spin rounded-full h-10 w-10 border-3 border-primary-200 border-t-primary-600"></div>
       </div>
     );
   }
 
+  const statItems = [
+    { value: stats.total, label: 'Total Words', color: 'primary' },
+    { value: stats.dueToday, label: 'Due Today', color: 'amber' },
+    { value: stats.mastered, label: 'Mastered', color: 'accent' },
+    { value: stats.learning, label: 'Learning', color: 'rose' },
+  ];
+
   return (
     <div className="animate-fade-in">
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-md border border-gray-200 dark:border-gray-800 p-4">
-          <div className="text-2xl font-bold text-blue-600">{stats.total}</div>
-          <div className="text-sm text-gray-600 dark:text-gray-400">Total Words</div>
-        </div>
-        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-md border border-gray-200 dark:border-gray-800 p-4">
-          <div className="text-2xl font-bold text-orange-600">{stats.dueToday}</div>
-          <div className="text-sm text-gray-600 dark:text-gray-400">Due Today</div>
-        </div>
-        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-md border border-gray-200 dark:border-gray-800 p-4">
-          <div className="text-2xl font-bold text-green-600">{stats.mastered}</div>
-          <div className="text-sm text-gray-600 dark:text-gray-400">Mastered</div>
-        </div>
-        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-md border border-gray-200 dark:border-gray-800 p-4">
-          <div className="text-2xl font-bold text-purple-600">{stats.learning}</div>
-          <div className="text-sm text-gray-600 dark:text-gray-400">Learning</div>
-        </div>
-      </div>
-
-      {/* Search and Filter */}
-      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-md border border-gray-200 dark:border-gray-800 p-4 mb-6">
-        <div className="flex flex-col md:flex-row gap-4">
-          <input
-            type="text"
-            placeholder="Search words..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <select
-            value={selectedTag || ''}
-            onChange={(e) => setSelectedTag(e.target.value || null)}
-            className="px-4 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        {statItems.map((stat, idx) => (
+          <div
+            key={stat.label}
+            className="bg-white dark:bg-slate-800/80 backdrop-blur-xl rounded-2xl p-5 border border-slate-200/50 dark:border-slate-700/50 shadow-soft hover:shadow-medium transition-all animate-slide-up"
+            style={{ animationDelay: `${idx * 0.08}s` }}
           >
-            <option value="">All Tags</option>
-            {allTags.map((tag) => (
-              <option key={tag} value={tag}>
-                {tag}
-              </option>
-            ))}
-          </select>
+            <div className={`text-3xl font-bold text-${stat.color}-600 dark:text-${stat.color}-400 mb-1`}>
+              {stat.value}
+            </div>
+            <div className="text-sm text-slate-600 dark:text-slate-400 font-medium">
+              {stat.label}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="bg-white dark:bg-slate-800/80 backdrop-blur-xl rounded-2xl p-5 mb-8 border border-slate-200/50 dark:border-slate-700/50 shadow-soft">
+        <div className="flex flex-col md:flex-row gap-4">
+          <div className="flex-1 relative">
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">🔍</span>
+            <input
+              type="text"
+              placeholder="Search words..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all placeholder:text-slate-400"
+            />
+          </div>
+          <div className="w-full md:w-auto">
+            <div className="relative">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">🏷️</span>
+              <select
+                value={selectedTag || ''}
+                onChange={(e) => setSelectedTag(e.target.value || null)}
+                className="w-full md:w-48 pl-11 pr-10 py-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all appearance-none cursor-pointer"
+              >
+                <option value="">All Tags</option>
+                {allTags.map((tag) => (
+                  <option key={tag} value={tag}>
+                    {tag}
+                  </option>
+                ))}
+              </select>
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">▼</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Word List */}
       {filteredWords.length === 0 ? (
-        <div className="text-center py-12 bg-white dark:bg-gray-900 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-800">
-          <p className="text-gray-500 dark:text-gray-400 text-lg mb-4">
-            {words.length === 0 ? 'No words yet. Start building your vocabulary!' : 'No words match your search.'}
+        <div className="text-center py-16 bg-white dark:bg-slate-800/80 backdrop-blur-xl rounded-3xl border border-slate-200/50 dark:border-slate-700/50 shadow-soft">
+          <div className="text-6xl mb-4 animate-float">📚</div>
+          <p className="text-slate-600 dark:text-slate-400 text-lg mb-2 font-medium">
+            {words.length === 0 ? 'No words yet' : 'No words match your search'}
+          </p>
+          <p className="text-slate-500 dark:text-slate-500">
+            {words.length === 0 ? 'Start building your vocabulary!' : 'Try adjusting your filters'}
           </p>
         </div>
       ) : (
-        <div className="grid gap-4">
-          {filteredWords.map((word) => (
+        <div className="space-y-4">
+          {filteredWords.map((word, idx) => (
             <div
               key={word.id}
               onClick={() => setSelectedWord(word)}
-              className="bg-white dark:bg-gray-900 rounded-xl shadow-md border border-gray-200 dark:border-gray-800 p-6 hover:shadow-lg transition-shadow cursor-pointer"
+              className="bg-white dark:bg-slate-800/80 backdrop-blur-xl rounded-2xl p-6 border border-slate-200/50 dark:border-slate-700/50 shadow-soft hover:shadow-medium hover:-translate-y-1 transition-all cursor-pointer animate-slide-up group"
+              style={{ animationDelay: `${idx * 0.04}s` }}
             >
               <div className="flex items-start justify-between">
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-3 mb-2">
-                    <h3 className="text-xl font-bold text-gray-800 dark:text-white">{word.word}</h3>
+                    <h3 className="text-2xl font-bold text-slate-900 dark:text-white group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
+                      {word.word}
+                    </h3>
                     {word.phonetic && (
-                      <span className="text-gray-500 dark:text-gray-400">{word.phonetic}</span>
+                      <span className="text-slate-500 dark:text-slate-400 text-base font-mono">
+                        {word.phonetic}
+                      </span>
                     )}
                   </div>
-                  
-                  {/* Chinese Definition */}
-                  <p className="text-green-600 dark:text-green-400 mb-2 line-clamp-2">
+
+                  <p className="text-accent-600 dark:text-accent-400 text-lg mb-3 line-clamp-2">
                     {getChineseDefinition(word)}
                   </p>
 
-                  {/* Tags */}
-                  <div className="flex flex-wrap gap-2 mt-3">
-                    {word.tags.map((tag) => (
-                      <span
-                        key={tag}
-                        className="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-sm"
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
+                  {word.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {word.tags.map((tag) => (
+                        <span
+                          key={tag}
+                          className="px-3 py-1 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 rounded-full text-sm font-medium border border-primary-100 dark:border-primary-800/30"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <div className="text-right ml-4">
-                  <div className="text-sm text-gray-500 dark:text-gray-400">
+                <div className="text-right ml-6 flex flex-col gap-1">
+                  <div className="text-sm text-slate-600 dark:text-slate-400 font-medium">
                     {getIntervalText(word.interval)}
                   </div>
-                  <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                  <div className="text-sm text-slate-500 dark:text-slate-500">
                     {word.reviewCount} reviews
                   </div>
                 </div>
