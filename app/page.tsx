@@ -38,8 +38,8 @@ export default function Home() {
         {currentView === 'add' && <AddWord />}
         {currentView === 'review' && <Review />}
         {currentView === 'settings' && <Settings />}
+        {currentView === 'ai-memory' && <AIMemory onClose={() => setCurrentView('list')} />}
       </main>
-      {currentView === 'ai-memory' && <AIMemory onClose={() => setCurrentView('list')} />}
     </div>
   );
 }

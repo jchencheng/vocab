@@ -11,7 +11,7 @@ interface AIMemoryProps {
 }
 
 export function AIMemory({ onClose }: AIMemoryProps) {
-  const { words, contexts, addContext, updateContext, deleteContext } = useApp();
+  const { words, contexts, addContext, updateContext, deleteContext, isLoading } = useApp();
   const [selectedWords, setSelectedWords] = useState<Set<string>>(new Set());
   const [generatedContent, setGeneratedContent] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -148,6 +148,18 @@ Format your response as a JSON object with this structure:
     });
   };
 
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white dark:bg-gray-900 rounded-2xl p-8 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-3"></div>
+          <span className="text-gray-600 dark:text-gray-400">Loading...</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white dark:bg-gray-900 dark:border-gray-800 rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden animate-slide-up flex flex-col">
@@ -192,27 +204,33 @@ Format your response as a JSON object with this structure:
                 <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-3">
                   Select Words ({selectedWords.size} selected)
                 </h3>
-                <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto p-2 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                  {words.map(word => (
-                    <button
-                      key={word.id}
-                      onClick={() => toggleWordSelection(word.id)}
-                      className={`px-3 py-1 rounded-full text-sm transition-colors ${
-                        selectedWords.has(word.id)
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600'
-                      }`}
-                    >
-                      {word.word}
-                    </button>
-                  ))}
-                </div>
+                {words.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                    No words available. Add some words first!
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto p-2 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                    {words.map(word => (
+                      <button
+                        key={word.id}
+                        onClick={() => toggleWordSelection(word.id)}
+                        className={`px-3 py-1 rounded-full text-sm transition-colors ${
+                          selectedWords.has(word.id)
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600'
+                        }`}
+                      >
+                        {word.word}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Generate Button */}
               <button
                 onClick={handleGenerate}
-                disabled={selectedWords.size === 0 || isGenerating}
+                disabled={selectedWords.size === 0 || isGenerating || words.length === 0}
                 className="w-full py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
               >
                 {isGenerating ? 'Generating...' : 'Generate Story'}
