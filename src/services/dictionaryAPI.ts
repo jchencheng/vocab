@@ -142,55 +142,8 @@ async function generateWordDefinition(
   word: string,
   settings?: AppSettings
 ): Promise<Omit<Word, 'id' | 'tags' | 'createdAt' | 'updatedAt' | 'nextReviewAt' | 'reviewCount' | 'easeFactor' | 'interval' | 'quality'>> {
-  // Try Vercel API first
-  try {
-    return await generateWithVercelAPI(word);
-  } catch (error) {
-    console.error('Vercel API error:', error);
-  }
-
-  // Fallback to direct Gemini API
-  const apiKey = settings?.apiKey;
-  if (!apiKey) {
-    throw new Error('No API key configured');
-  }
-
-  const prompt = `Provide a detailed dictionary definition for the word "${word}" in JSON format with the following structure:
-{
-  "word": "${word}",
-  "phonetic": "/phonetic/",
-  "meanings": [
-    {
-      "partOfSpeech": "noun|verb|adjective|adverb|etc",
-      "definitions": [
-        {
-          "definition": "clear English definition",
-          "example": "example sentence",
-          "chineseDefinition": "中文释义"
-        }
-      ]
-    }
-  ]
-}
-Include at least 2 meanings with different parts of speech if applicable.`;
-
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{
-        parts: [{ text: prompt }]
-      }]
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`API error: ${response.status}`);
-  }
-
-  const data = await response.json();
-  const content = data.candidates[0].content.parts[0].text;
-  return parseWordData(content);
+  // Use Vercel API with GLM-4.7-Flash
+  return await generateWithVercelAPI(word);
 }
 
 export async function fetchWord(
