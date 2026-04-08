@@ -3,7 +3,11 @@
 1. vercel-react-best-practices
 2. vercel-composition-patterns
 
-# 有重要修改时，必须要向我确认。
+# 代码有重要修改时，必须要向我确认，包括不限于：
+
+- [ ] 算法实现
+- [ ] 配置文件修改
+- [ ] 功能逻辑修改
 
 <br />
 

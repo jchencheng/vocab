@@ -1,9 +1,16 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { ReactNode } from 'react';
 import type { Word, AppSettings, ReviewStats } from '../types';
-import { supabaseService } from '../services/supabaseService';
 import { useAuth } from './AuthContext';
 import { calculateStats } from '../utils';
+import {
+  fetchWords,
+  addWordAPI,
+  updateWordAPI,
+  deleteWordAPI,
+  fetchSettings,
+  saveSettingsAPI,
+} from '../services/apiClient';
 
 interface AppContextType {
   words: Word[];
@@ -32,7 +39,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const refreshWords = useCallback(async () => {
     if (!user) return;
     try {
-      const allWords = await supabaseService.getAllWords(user.id);
+      const allWords = await fetchWords(user.id);
       setWords(allWords);
     } catch (error) {
       console.error('Error refreshing words:', error);
@@ -42,7 +49,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const addWord = useCallback(async (word: Word) => {
     if (!user) return;
     try {
-      await supabaseService.addWord(word, user.id);
+      await addWordAPI(word, user.id);
       await refreshWords();
     } catch (error) {
       console.error('Error adding word:', error);
@@ -53,7 +60,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const updateWord = useCallback(async (word: Word) => {
     if (!user) return;
     try {
-      await supabaseService.updateWord(word, user.id);
+      await updateWordAPI(word, user.id);
       await refreshWords();
     } catch (error) {
       console.error('Error updating word:', error);
@@ -64,7 +71,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const deleteWord = useCallback(async (id: string) => {
     if (!user) return;
     try {
-      await supabaseService.deleteWord(id, user.id);
+      await deleteWordAPI(id, user.id);
       await refreshWords();
     } catch (error) {
       console.error('Error deleting word:', error);
@@ -75,7 +82,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const saveSettings = useCallback(async (newSettings: AppSettings) => {
     if (!user) return;
     try {
-      await supabaseService.saveSettings(newSettings, user.id);
+      await saveSettingsAPI(newSettings, user.id);
       setSettings(newSettings);
     } catch (error) {
       console.error('Error saving settings:', error);
@@ -114,7 +121,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       try {
         setIsLoading(true);
         await refreshWords();
-        const savedSettings = await supabaseService.getSettings(user.id);
+        const savedSettings = await fetchSettings(user.id);
         if (savedSettings) {
           setSettings(savedSettings);
           setIsDarkMode(savedSettings.darkMode || false);
@@ -165,7 +172,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 export function useApp() {
   const context = useContext(AppContext);
   if (context === undefined) {
-    throw new Error('useApp must be used within an AppProvider');
+    throw new Error('useApp must be used within an AuthProvider');
   }
   return context;
 }
