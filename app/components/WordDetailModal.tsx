@@ -159,7 +159,7 @@ export function WordDetailModal({ word, onClose, onDelete }: WordDetailModalProp
                     {meaning.partOfSpeech}
                   </span>
                   <ul className="space-y-3">
-                    {meaning.definitions.map((def, defIdx) => (
+                    {meaning.definitions.map((def: any, defIdx: number) => (
                       <li key={defIdx}>
                         <div className="font-medium text-gray-800 dark:text-white">{def.definition}</div>
                         {def.chineseDefinition && (
