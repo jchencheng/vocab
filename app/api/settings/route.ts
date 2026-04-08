@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '../services/supabase';
 
+// 将驼峰式字段名转换为下划线式
+function mapSettingsToDB(settings: any) {
+  return {
+    max_daily_reviews: settings.maxDailyReviews || 50,
+    dark_mode: settings.darkMode || false,
+    updated_at: Date.now(),
+  };
+}
+
 // GET /api/settings?userId=xxx
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -42,13 +51,14 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'settings and userId are required' }, { status: 400 });
     }
 
+    const dbSettings = mapSettingsToDB(settings);
+
     // Try to update first
     const { error: updateError } = await supabase
       .from('settings')
       .update({
-        ...settings,
+        ...dbSettings,
         user_id: userId,
-        updated_at: Date.now()
       })
       .eq('user_id', userId);
 
@@ -60,9 +70,8 @@ export async function PUT(request: NextRequest) {
     const { error: insertError } = await supabase
       .from('settings')
       .insert({
-        ...settings,
+        ...dbSettings,
         user_id: userId,
-        updated_at: Date.now()
       });
 
     if (insertError) {

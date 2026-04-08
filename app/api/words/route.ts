@@ -1,6 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '../services/supabase';
 
+// 将驼峰式字段名转换为下划线式
+function mapWordToDB(word: any) {
+  return {
+    id: word.id,
+    word: word.word,
+    phonetic: word.phonetic || null,
+    phonetics: word.phonetics || [],
+    meanings: word.meanings || [],
+    tags: word.tags || [],
+    custom_note: word.customNote || null,
+    interval: word.interval || 1,
+    ease_factor: word.easeFactor || 2.5,
+    review_count: word.reviewCount || 0,
+    next_review_at: word.nextReviewAt || Date.now(),
+    created_at: word.createdAt || Date.now(),
+    updated_at: word.updatedAt || Date.now(),
+    quality: word.quality || 0,
+  };
+}
+
 // GET /api/words?userId=xxx
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -38,9 +58,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'word and userId are required' }, { status: 400 });
     }
 
+    const dbWord = mapWordToDB(word);
+
     const { error } = await supabase
       .from('words')
-      .insert({ ...word, user_id: userId });
+      .insert({ ...dbWord, user_id: userId });
 
     if (error) {
       console.error('Error adding word:', error);
@@ -63,9 +85,11 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'word and userId are required' }, { status: 400 });
     }
 
+    const dbWord = mapWordToDB(word);
+
     const { error } = await supabase
       .from('words')
-      .update({ ...word, user_id: userId })
+      .update({ ...dbWord, user_id: userId })
       .eq('id', word.id)
       .eq('user_id', userId);
 
