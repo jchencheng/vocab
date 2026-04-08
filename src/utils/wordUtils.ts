@@ -16,6 +16,18 @@ export function getChineseDefinition(word: Word): string {
   return defs.slice(0, 3).join('; ');
 }
 
+export function getExampleSentence(word: Word): string | null {
+  // 遍历所有 meanings 和 definitions，找到第一个有 example 的
+  for (const meaning of word.meanings) {
+    for (const def of meaning.definitions) {
+      if (def.example && def.example.trim()) {
+        return def.example;
+      }
+    }
+  }
+  return null;
+}
+
 export function calculateStats(words: Word[]): ReviewStats {
   const now = Date.now();
   const dueToday = words.filter(w => w.nextReviewAt <= now).length;

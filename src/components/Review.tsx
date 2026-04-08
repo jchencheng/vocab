@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { calculateNextReview, getTodayReviewQueue, postponeWithPriority, getChineseDefinition, playAudio, hasAudio } from '../utils';
+import { calculateNextReview, getTodayReviewQueue, postponeWithPriority, getChineseDefinition, getExampleSentence, playAudio, hasAudio } from '../utils';
 import { DEFAULT_MAX_DAILY_REVIEWS } from '../constants';
 import type { ReviewMode } from '../types';
 
@@ -135,6 +135,9 @@ export function Review() {
     );
   }
 
+  // 获取例句
+  const exampleSentence = getExampleSentence(currentWord);
+
   return (
     <div className="max-w-3xl mx-auto p-3 sm:p-6 animate-fade-in">
       <div className="text-center mb-6 sm:mb-8">
@@ -239,6 +242,14 @@ export function Review() {
                   </div>
                 )}
               </div>
+
+              {/* 显示例句 */}
+              {exampleSentence && (
+                <div className="mb-6 p-3 sm:p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-lg">
+                  <h4 className="text-xs sm:text-sm font-semibold text-blue-600 dark:text-blue-400 mb-2">Example</h4>
+                  <p className="text-sm sm:text-base text-gray-700 dark:text-gray-300 italic">"{exampleSentence}"</p>
+                </div>
+              )}
 
               <div className="mb-4 sm:mb-6">
                 <h4 className="text-base sm:text-lg font-semibold text-gray-700 dark:text-gray-300 mb-3">How well did you remember?</h4>
