@@ -15,6 +15,12 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// 获取当前网站的 URL（用于邮箱验证和密码重置）
+const getSiteUrl = () => {
+  // 优先使用环境变量中的 URL，否则使用当前页面 origin
+  return import.meta.env.VITE_SITE_URL || window.location.origin;
+};
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -50,6 +56,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { error, data } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        emailRedirectTo: `${getSiteUrl()}/login`,
+      },
     });
     
     // Check if email confirmation is required
@@ -64,7 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const resetPassword = useCallback(async (email: string) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: `${getSiteUrl()}/reset-password`,
     });
     return { error: error as Error | null };
   }, []);
