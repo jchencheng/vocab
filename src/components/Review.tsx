@@ -1,6 +1,6 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { calculateNextReview, getDueWords, shuffleWords, limitWords, getChineseDefinition, playAudio, hasAudio } from '../utils';
+import { calculateNextReview, getTodayReviewQueue, postponeToTomorrow, getChineseDefinition, playAudio, hasAudio } from '../utils';
 import { DEFAULT_MAX_DAILY_REVIEWS } from '../constants';
 import type { ReviewMode } from '../types';
 
@@ -10,15 +10,32 @@ export function Review() {
   const [showAnswer, setShowAnswer] = useState(false);
   const [reviewMode, setReviewMode] = useState<ReviewMode>('en2zh');
   const [isComplete, setIsComplete] = useState(false);
+  const [isPostponing, setIsPostponing] = useState(false);
 
-  const reviewQueue = useMemo(() => {
-    const due = getDueWords(words);
-    const shuffled = shuffleWords(due);
-    const maxDailyReviews = settings.maxDailyReviews || DEFAULT_MAX_DAILY_REVIEWS;
-    return limitWords(shuffled, maxDailyReviews);
-  }, [words, settings.maxDailyReviews]);
+  const maxDailyReviews = settings.maxDailyReviews || DEFAULT_MAX_DAILY_REVIEWS;
 
-  const currentWord = reviewQueue[currentIndex];
+  // 获取今日复习队列和需要推迟的单词
+  const { todayQueue, postponedWords } = useMemo(() => {
+    return getTodayReviewQueue(words, maxDailyReviews);
+  }, [words, maxDailyReviews]);
+
+  // 组件加载时，自动推迟超出限制的单词
+  useEffect(() => {
+    async function postponeExtraWords() {
+      if (postponedWords.length > 0 && !isPostponing) {
+        setIsPostponing(true);
+        // 将超出限制的单词推迟到明天
+        for (const word of postponedWords) {
+          const postponedWord = postponeToTomorrow(word);
+          await updateWord(postponedWord);
+        }
+        setIsPostponing(false);
+      }
+    }
+    postponeExtraWords();
+  }, [postponedWords, updateWord, isPostponing]);
+
+  const currentWord = todayQueue[currentIndex];
 
   const handlePlayAudio = useCallback(() => {
     if (currentWord) {
@@ -32,13 +49,13 @@ export function Review() {
     const updatedWord = calculateNextReview(currentWord, quality);
     await updateWord(updatedWord);
 
-    if (currentIndex + 1 >= reviewQueue.length) {
+    if (currentIndex + 1 >= todayQueue.length) {
       setIsComplete(true);
     } else {
       setCurrentIndex(prev => prev + 1);
       setShowAnswer(false);
     }
-  }, [currentWord, currentIndex, reviewQueue.length, updateWord]);
+  }, [currentWord, currentIndex, todayQueue.length, updateWord]);
 
   const reset = useCallback(() => {
     setCurrentIndex(0);
@@ -46,7 +63,7 @@ export function Review() {
     setIsComplete(false);
   }, []);
 
-  if (reviewQueue.length === 0) {
+  if (todayQueue.length === 0) {
     return (
       <div className="max-w-2xl mx-auto p-6 animate-fade-in">
         <div className="text-center py-16">
@@ -55,6 +72,11 @@ export function Review() {
           <p className="text-xl text-gray-600 dark:text-gray-400 mb-8">
             You have no words to review right now.
           </p>
+          {postponedWords.length > 0 && (
+            <p className="text-sm text-gray-500 dark:text-gray-500 mb-4">
+              {postponedWords.length} words postponed to tomorrow
+            </p>
+          )}
           <button
             onClick={reset}
             className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-medium hover:opacity-90 transition-opacity"
@@ -72,9 +94,14 @@ export function Review() {
         <div className="text-center py-16">
           <div className="text-8xl mb-6">✅</div>
           <h2 className="text-3xl font-bold text-gray-800 dark:text-white mb-4">Review Complete!</h2>
-          <p className="text-xl text-gray-600 dark:text-gray-400 mb-8">
-            You reviewed {reviewQueue.length} words!
+          <p className="text-xl text-gray-600 dark:text-gray-400 mb-2">
+            You reviewed {todayQueue.length} words!
           </p>
+          {postponedWords.length > 0 && (
+            <p className="text-sm text-gray-500 dark:text-gray-500 mb-8">
+              {postponedWords.length} words postponed to tomorrow
+            </p>
+          )}
           <button
             onClick={reset}
             className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-medium hover:opacity-90 transition-opacity"
@@ -105,12 +132,17 @@ export function Review() {
       <div className="text-center mb-8">
         <h2 className="text-3xl font-bold text-gray-800 dark:text-white mb-2">Review</h2>
         <p className="text-gray-600 dark:text-gray-400">
-          {currentIndex + 1} of {reviewQueue.length}
+          {currentIndex + 1} of {todayQueue.length}
+          {postponedWords.length > 0 && (
+            <span className="text-sm text-gray-500 dark:text-gray-500 ml-2">
+              (+{postponedWords.length} postponed)
+            </span>
+          )}
         </p>
         <div className="w-full bg-gray-200 dark:bg-gray-800 rounded-full h-2 mt-4">
           <div
             className="bg-gradient-to-r from-blue-600 to-purple-600 h-2 rounded-full transition-all duration-300"
-            style={{ width: `${((currentIndex + 1) / reviewQueue.length) * 100}%` }}
+            style={{ width: `${((currentIndex + 1) / todayQueue.length) * 100}%` }}
           />
         </div>
       </div>

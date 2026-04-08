@@ -71,3 +71,38 @@ export function shuffleWords(words: Word[]): Word[] {
 export function limitWords(words: Word[], limit: number): Word[] {
   return words.slice(0, limit);
 }
+
+/**
+ * 获取今日复习队列，并将超出限制的单词推迟到明天
+ * @param words 所有单词
+ * @param maxDailyReviews 每日最大复习数量
+ * @returns 今日复习队列和需要推迟的单词
+ */
+export function getTodayReviewQueue(
+  words: Word[],
+  maxDailyReviews: number
+): { todayQueue: Word[]; postponedWords: Word[] } {
+  const now = Date.now();
+  const dueWords = words.filter(w => w.nextReviewAt <= now);
+  const shuffled = shuffleWords(dueWords);
+  
+  const todayQueue = shuffled.slice(0, maxDailyReviews);
+  const postponedWords = shuffled.slice(maxDailyReviews);
+  
+  return { todayQueue, postponedWords };
+}
+
+/**
+ * 将单词推迟到明天复习（保持原有间隔不变）
+ * @param word 要推迟的单词
+ * @returns 更新后的单词
+ */
+export function postponeToTomorrow(word: Word): Word {
+  const now = Date.now();
+  const tomorrow = now + 24 * 60 * 60 * 1000;
+  
+  return {
+    ...word,
+    nextReviewAt: tomorrow,
+  };
+}
