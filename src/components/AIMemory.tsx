@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { db } from '../services';
-import { formatDate } from '../utils';
+import { formatDate, formatWithBionicReading } from '../utils';
 import type { AIContext } from '../types';
 
 export function AIMemory() {
@@ -49,8 +49,8 @@ export function AIMemory() {
       const data = await response.json();
       const newContext: AIContext = {
         id: crypto.randomUUID(),
-        wordIds: selectedWordIds,
         content: data.content,
+        wordIds: selectedWordIds,
         createdAt: Date.now(),
       };
 
@@ -58,9 +58,8 @@ export function AIMemory() {
       await loadContexts();
       setShowContexts(true);
       setSelectedWordIds([]);
-    } catch (err: any) {
-      console.error('Error generating context:', err);
-      setError(`Failed to generate context: ${err.message}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to generate story');
     } finally {
       setIsGenerating(false);
     }
@@ -111,6 +110,29 @@ export function AIMemory() {
     setViewingContext(null);
   }, []);
 
+  // 渲染带 Bionic Reading 的文本
+  const renderBionicText = useCallback((text: string, isEnglish: boolean) => {
+    if (!isEnglish) {
+      // 中文直接返回
+      return text;
+    }
+    
+    // 英文应用 Bionic Reading
+    const parts = formatWithBionicReading(text);
+    return parts.map((part, idx) => {
+      if (part.type === 'bionic') {
+        // 使用 dangerouslySetInnerHTML 渲染加粗标签
+        return (
+          <span 
+            key={idx} 
+            dangerouslySetInnerHTML={{ __html: part.content }}
+          />
+        );
+      }
+      return <span key={idx}>{part.content}</span>;
+    });
+  }, []);
+
   const formatContent = useMemo(() => {
     return (content: string) => {
       return content
@@ -129,6 +151,10 @@ export function AIMemory() {
                   } else if (part === '中文：') {
                     return <span key={partIdx} className="font-semibold text-green-600 dark:text-green-400">中文：</span>;
                   } else {
+                    // 检查这部分是否是英文内容（在"英文："之后）
+                    const prevPart = parts[partIdx - 1];
+                    const isEnglish = prevPart === '英文：';
+                    
                     return part.split(/(\*\*[^*]+\*\*)/g).map((subPart, subIdx) => {
                       if (subPart.startsWith('**') && subPart.endsWith('**')) {
                         const innerContent = subPart.slice(2, -2);
@@ -143,6 +169,14 @@ export function AIMemory() {
                                 （{definition}
                               </span>
                             )}
+                          </span>
+                        );
+                      }
+                      // 对非高亮文本应用 Bionic Reading（仅英文）
+                      if (isEnglish && subPart.trim()) {
+                        return (
+                          <span key={subIdx}>
+                            {renderBionicText(subPart, true)}
                           </span>
                         );
                       }
@@ -172,6 +206,14 @@ export function AIMemory() {
                       </span>
                     );
                   }
+                  // 对普通段落应用 Bionic Reading
+                  if (part.trim()) {
+                    return (
+                      <span key={partIdx}>
+                        {renderBionicText(part, true)}
+                      </span>
+                    );
+                  }
                   return part;
                 })}
               </div>
@@ -179,7 +221,7 @@ export function AIMemory() {
           }
         });
     };
-  }, []);
+  }, [renderBionicText]);
 
   return (
     <div className="max-w-4xl mx-auto p-6 animate-fade-in">
