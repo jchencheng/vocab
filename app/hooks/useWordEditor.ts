@@ -13,7 +13,7 @@ export function useWordEditor({ initialWord }: UseWordEditorOptions) {
   const [editMeanings, setEditMeanings] = useState<Meaning[]>(
     initialWord.meanings.map(m => ({
       ...m,
-      definitions: m.definitions.map(d => ({ ...d })),
+      definitions: m.definitions.map((d: any) => ({ ...d })),
     }))
   );
   const [editTags, setEditTags] = useState(initialWord.tags.join(', '));
@@ -98,7 +98,7 @@ export function useWordEditor({ initialWord }: UseWordEditorOptions) {
     setEditMeanings(
       initialWord.meanings.map(m => ({
         ...m,
-        definitions: m.definitions.map(d => ({ ...d })),
+        definitions: m.definitions.map((d: any) => ({ ...d })),
       }))
     );
     setEditTags(initialWord.tags.join(', '));

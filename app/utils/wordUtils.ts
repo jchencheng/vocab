@@ -11,7 +11,7 @@ export function getIntervalText(interval: number): string {
 
 export function getChineseDefinition(word: Word): string {
   const defs = word.meanings.flatMap(m => 
-    m.definitions.map(d => d.chineseDefinition || d.definition)
+    m.definitions.map((d: any) => d.chineseDefinition || d.definition)
   );
   return defs.slice(0, 3).join('; ');
 }
