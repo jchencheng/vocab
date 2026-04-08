@@ -232,7 +232,10 @@ export function AIMemory() {
           {isGenerating ? 'Generating...' : 'Generate Story'}
         </button>
         <button
-          onClick={loadContexts}
+          onClick={() => {
+            loadContexts();
+            setShowContexts(true);
+          }}
           className="ml-3 px-6 py-3 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 dark:bg-gray-900 rounded-xl font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
         >
           View History
