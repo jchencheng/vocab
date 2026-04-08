@@ -4,14 +4,8 @@ import type { Word, AIContext, AppSettings } from '../types';
 const SUPABASE_URL = 'https://bmvtpdofmnbrymosrwhy.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_0FkwKPJWq7-e3SZxbbdlMA_35Yd19Ft';
 
-// Schema 名称 - 用于隔离不同应用的数据
-export const SCHEMA_NAME = 'vocab_app';
-
-export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
-  db: {
-    schema: SCHEMA_NAME,
-  },
-});
+// 客户端 Supabase 配置 - 不使用自定义 schema（Publishable key 不支持）
+export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // 类型定义
 export interface SupabaseWord {
