@@ -152,18 +152,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const getStats = useCallback((): ReviewStats => {
     const now = Date.now();
-    const dueWords = words.filter(w => w.nextReviewAt <= now);
-    const totalWords = words.length;
-    const masteredWords = words.filter(w => w.reviewCount >= 5).length;
-    const learningWords = totalWords - masteredWords;
+    const dueToday = words.filter(w => w.nextReviewAt <= now).length;
+    const mastered = words.filter(w => w.interval >= 30).length;
+    const learning = words.filter(w => w.interval < 30 && w.reviewCount > 0).length;
     
     return {
-      totalWords,
-      dueWords: dueWords.length,
-      masteredWords,
-      learningWords,
-      streak: 0,
-      lastStudyDate: null,
+      total: words.length,
+      dueToday,
+      mastered,
+      learning,
     };
   }, [words]);
 

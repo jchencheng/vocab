@@ -28,10 +28,23 @@ export interface AppSettings {
 }
 
 export interface ReviewStats {
-  totalWords: number;
-  dueWords: number;
-  masteredWords: number;
-  learningWords: number;
-  streak: number;
-  lastStudyDate: string | null;
+  total: number;
+  dueToday: number;
+  mastered: number;
+  learning: number;
+}
+
+export interface Meaning {
+  partOfSpeech: string;
+  definitions: Definition[];
+  synonyms: string[];
+  antonyms: string[];
+}
+
+export interface Definition {
+  definition: string;
+  example?: string;
+  chineseDefinition?: string;
+  synonyms: string[];
+  antonyms: string[];
 }
