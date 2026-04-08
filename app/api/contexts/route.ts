@@ -9,6 +9,16 @@ const supabase = createClient(supabaseUrl, supabaseKey, {
   auth: { autoRefreshToken: false, persistSession: false }
 });
 
+// 将下划线式字段名转换为驼峰式
+function mapContextFromDB(dbContext: any) {
+  return {
+    id: dbContext.id,
+    content: dbContext.content,
+    wordIds: dbContext.word_ids || [],
+    createdAt: dbContext.created_at,
+  };
+}
+
 // GET /api/contexts?userId=xxx
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -30,7 +40,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json(data);
+    // 将数据库字段名转换为前端使用的驼峰式
+    const contexts = data?.map(mapContextFromDB) || [];
+    return NextResponse.json(contexts);
   } catch (error: any) {
     console.error('API error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
