@@ -11,6 +11,9 @@ export function AIMemory() {
   const [error, setError] = useState('');
   const [contexts, setContexts] = useState<AIContext[]>([]);
   const [showContexts, setShowContexts] = useState(false);
+  const [editingContext, setEditingContext] = useState<AIContext | null>(null);
+  const [editContent, setEditContent] = useState('');
+  const [viewingContext, setViewingContext] = useState<AIContext | null>(null);
 
   const loadContexts = useCallback(async () => {
     const allContexts = await db.getAllContexts();
@@ -75,6 +78,38 @@ export function AIMemory() {
     await db.deleteContext(contextId);
     await loadContexts();
   }, [loadContexts]);
+
+  const handleEdit = useCallback((context: AIContext) => {
+    setEditingContext(context);
+    setEditContent(context.content);
+  }, []);
+
+  const handleSaveEdit = useCallback(async () => {
+    if (!editingContext) return;
+
+    const updatedContext: AIContext = {
+      ...editingContext,
+      content: editContent,
+    };
+
+    await db.updateContext(updatedContext);
+    await loadContexts();
+    setEditingContext(null);
+    setEditContent('');
+  }, [editingContext, editContent, loadContexts]);
+
+  const handleCancelEdit = useCallback(() => {
+    setEditingContext(null);
+    setEditContent('');
+  }, []);
+
+  const handleView = useCallback((context: AIContext) => {
+    setViewingContext(context);
+  }, []);
+
+  const handleCloseView = useCallback(() => {
+    setViewingContext(null);
+  }, []);
 
   const formatContent = useMemo(() => {
     return (content: string) => {
@@ -223,13 +258,35 @@ export function AIMemory() {
             <div className="space-y-4">
               {contexts.map((context) => (
                 <div key={context.id} className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
-                  <div className="text-sm text-gray-500 dark:text-gray-400 mb-2">
-                    {formatDate(context.createdAt)}
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-sm text-gray-500 dark:text-gray-400">
+                      {formatDate(context.createdAt)}
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleView(context)}
+                        className="px-3 py-1 text-sm bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-800/30 transition-colors"
+                      >
+                        View
+                      </button>
+                      <button
+                        onClick={() => handleEdit(context)}
+                        className="px-3 py-1 text-sm bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-lg hover:bg-green-200 dark:hover:bg-green-800/30 transition-colors"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDeleteContext(context.id)}
+                        className="px-3 py-1 text-sm bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-lg hover:bg-red-200 dark:hover:bg-red-800/30 transition-colors"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
-                  <div className="text-gray-700 dark:text-gray-300 leading-relaxed">
+                  <div className="text-gray-700 dark:text-gray-300 leading-relaxed line-clamp-3">
                     {formatContent(context.content)}
                   </div>
-                  <div className="mt-3 flex gap-2">
+                  <div className="mt-3 flex gap-2 flex-wrap">
                     {context.wordIds.map((wordId) => {
                       const word = words.find(w => w.id === wordId);
                       return word ? (
@@ -242,16 +299,103 @@ export function AIMemory() {
                       ) : null;
                     })}
                   </div>
-                  <button
-                    onClick={() => handleDeleteContext(context.id)}
-                    className="mt-3 text-sm text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
-                  >
-                    Delete
-                  </button>
                 </div>
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* View Modal */}
+      {viewingContext && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-900 dark:border-gray-800 rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto animate-slide-up">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-bold text-gray-800 dark:text-white">View Story</h3>
+                <button
+                  onClick={handleCloseView}
+                  className="p-2 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                {formatDate(viewingContext.createdAt)}
+              </div>
+              <div className="text-gray-700 dark:text-gray-300 leading-relaxed">
+                {formatContent(viewingContext.content)}
+              </div>
+              <div className="mt-4 flex gap-2 flex-wrap">
+                {viewingContext.wordIds.map((wordId) => {
+                  const word = words.find(w => w.id === wordId);
+                  return word ? (
+                    <span
+                      key={wordId}
+                      className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs rounded-full"
+                    >
+                      {word.word}
+                    </span>
+                  ) : null;
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {editingContext && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-900 dark:border-gray-800 rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto animate-slide-up">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-bold text-gray-800 dark:text-white">Edit Story</h3>
+                <button
+                  onClick={handleCancelEdit}
+                  className="p-2 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                {formatDate(editingContext.createdAt)}
+              </div>
+              <textarea
+                value={editContent}
+                onChange={(e) => setEditContent(e.target.value)}
+                rows={20}
+                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              />
+              <div className="mt-4 flex gap-2 flex-wrap">
+                {editingContext.wordIds.map((wordId) => {
+                  const word = words.find(w => w.id === wordId);
+                  return word ? (
+                    <span
+                      key={wordId}
+                      className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs rounded-full"
+                    >
+                      {word.word}
+                    </span>
+                  ) : null;
+                })}
+              </div>
+              <div className="mt-6 flex gap-3">
+                <button
+                  onClick={handleCancelEdit}
+                  className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 dark:bg-gray-900 rounded-xl font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveEdit}
+                  className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-medium hover:opacity-90 transition-opacity"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

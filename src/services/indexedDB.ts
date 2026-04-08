@@ -132,7 +132,16 @@ class IndexedDBService {
   async addContext(context: AIContext): Promise<void> {
     const store = await this.getStore(STORE_CONTEXTS, 'readwrite');
     return new Promise((resolve, reject) => {
-      const request = store.add(context);
+      const request = store.put(context);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async updateContext(context: AIContext): Promise<void> {
+    const store = await this.getStore(STORE_CONTEXTS, 'readwrite');
+    return new Promise((resolve, reject) => {
+      const request = store.put(context);
       request.onsuccess = () => resolve();
       request.onerror = () => reject(request.error);
     });
