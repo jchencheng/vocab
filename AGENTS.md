@@ -15,3 +15,4 @@
 
 - web-design-guidelines
 
+# 敏感信息在任何情况下都不能提交到github等平台。

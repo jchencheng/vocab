@@ -1,3 +1,5 @@
+'use client';
+
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 import { supabase } from '../services/supabase';
 import type { User, Session } from '@supabase/supabase-js';
@@ -17,8 +19,11 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // 获取当前网站的 URL（用于邮箱验证和密码重置）
 const getSiteUrl = () => {
-  // 优先使用环境变量中的 URL，否则使用当前页面 origin
-  return import.meta.env.VITE_SITE_URL || window.location.origin;
+  // 在客户端使用 window.location.origin
+  if (typeof window !== 'undefined') {
+    return window.location.origin;
+  }
+  return 'https://vocab-uxctcgk59-chengchengs-projects-398a16c3.vercel.app';
 };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
