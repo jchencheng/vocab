@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { ReactNode } from 'react';
 import type { Word, AppSettings, ReviewStats } from '../types';
 import { supabaseService } from '../services/supabaseService';
@@ -27,6 +27,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<AppSettings>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const lastUserIdRef = useRef<string | null>(null);
 
   const refreshWords = useCallback(async () => {
     if (!user) return;
@@ -100,6 +101,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     async function loadData() {
       if (!isAuthenticated || !user) {
         setIsLoading(false);
+        lastUserIdRef.current = null;
+        return;
+      }
+
+      // 只有当用户真正变化时才重新加载数据
+      if (lastUserIdRef.current === user.id) {
+        setIsLoading(false);
         return;
       }
 
@@ -111,6 +119,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setSettings(savedSettings);
           setIsDarkMode(savedSettings.darkMode || false);
         }
+        lastUserIdRef.current = user.id;
       } catch (error) {
         console.error('Error loading data:', error);
       } finally {
