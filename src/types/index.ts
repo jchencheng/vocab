@@ -26,6 +26,7 @@ export interface Word {
   meanings: Meaning[];
   tags: string[];
   createdAt: number;
+  updatedAt: number;
   nextReviewAt: number;
   reviewCount: number;
   easeFactor: number;
@@ -41,6 +42,9 @@ export interface AppSettings {
   darkMode?: boolean;
   maxDailyReviews?: number;
 }
+
+// Alias for backward compatibility
+export type UserSettings = AppSettings;
 
 export interface AIContext {
   id: string;

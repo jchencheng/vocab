@@ -1,5 +1,7 @@
 import { useState } from 'react';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { AppProvider, useApp } from './context/AppContext';
+import { Login } from './components/Login';
 import { Navbar } from './components/Navbar';
 import { AddWord } from './components/AddWord';
 import { WordList } from './components/WordList';
@@ -10,13 +12,32 @@ import { Settings } from './components/Settings';
 function AppContent() {
   const [activeTab, setActiveTab] = useState('add');
   const { isLoading } = useApp();
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
 
-  if (isLoading) {
+  // Show loading while checking auth state
+  if (isAuthLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
         <div className="text-center">
           <div className="text-4xl mb-4 animate-spin">📖</div>
-          <p className="text-gray-600">Loading...</p>
+          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show login page if not authenticated
+  if (!isAuthenticated) {
+    return <Login />;
+  }
+
+  // Show loading while loading app data
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-4xl mb-4 animate-spin">📖</div>
+          <p className="text-gray-600 dark:text-gray-400">Loading your data...</p>
         </div>
       </div>
     );
@@ -38,9 +59,11 @@ function AppContent() {
 
 function App() {
   return (
-    <AppProvider>
-      <AppContent />
-    </AppProvider>
+    <AuthProvider>
+      <AppProvider>
+        <AppContent />
+      </AppProvider>
+    </AuthProvider>
   );
 }
 

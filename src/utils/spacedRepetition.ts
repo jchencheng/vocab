@@ -7,7 +7,7 @@ import {
 } from '../constants';
 
 export function createNewWord(
-  wordData: Omit<Word, 'id' | 'tags' | 'createdAt' | 'nextReviewAt' | 'reviewCount' | 'easeFactor' | 'interval' | 'quality'>,
+  wordData: Omit<Word, 'id' | 'tags' | 'createdAt' | 'updatedAt' | 'nextReviewAt' | 'reviewCount' | 'easeFactor' | 'interval' | 'quality'>,
   tags: string[] = []
 ): Word {
   const now = Date.now();
@@ -16,6 +16,7 @@ export function createNewWord(
     id: crypto.randomUUID(),
     tags,
     createdAt: now,
+    updatedAt: now,
     nextReviewAt: now,
     reviewCount: 0,
     easeFactor: DEFAULT_EASE_FACTOR,
@@ -41,21 +42,20 @@ export function calculateNextReview(word: Word, quality: number): Word {
     reviewCount++;
   }
 
-  easeFactor = easeFactor + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02));
-  if (easeFactor < MIN_EASE_FACTOR) {
-    easeFactor = MIN_EASE_FACTOR;
-  }
+  easeFactor = Math.max(
+    MIN_EASE_FACTOR,
+    easeFactor + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02))
+  );
 
-  const now = Date.now();
-  const nextReviewAt = now + interval * 24 * 60 * 60 * 1000;
+  const nextReviewAt = Date.now() + interval * 24 * 60 * 60 * 1000;
 
   return {
     ...word,
     easeFactor,
     interval,
     reviewCount,
-    quality,
     nextReviewAt,
+    updatedAt: Date.now(),
   };
 }
 
@@ -95,54 +95,44 @@ export function sortByPriority(words: Word[]): Word[] {
  * 获取今日复习队列（按优先级排序），并将超出限制的单词分散推迟
  * @param words 所有单词
  * @param maxDailyReviews 每日最大复习数量
- * @returns 今日复习队列和需要推迟的单词（已设置好分散的复习时间）
+ * @returns 今日复习队列和需要推迟的单词
  */
-export function getTodayReviewQueue(
-  words: Word[],
-  maxDailyReviews: number
-): { todayQueue: Word[]; postponedWords: Word[] } {
-  const now = Date.now();
-  const dueWords = words.filter(w => w.nextReviewAt <= now);
+export function getTodayReviewQueue(words: Word[], maxDailyReviews: number): { todayQueue: Word[]; postponedWords: Word[] } {
+  const dueWords = getDueWords(words);
+  const shuffled = shuffleWords(dueWords);
   
-  // 按优先级排序（间隔长的优先）
-  const sortedWords = sortByPriority(dueWords);
-  
-  const todayQueue = sortedWords.slice(0, maxDailyReviews);
-  const postponedWords = sortedWords.slice(maxDailyReviews);
+  const todayQueue = limitWords(shuffled, maxDailyReviews);
+  const postponedWords = shuffled.slice(maxDailyReviews);
   
   return { todayQueue, postponedWords };
 }
 
 /**
- * 将单词分散推迟到未来几天
- * 策略：超出限制的单词按优先级分散到未来3-7天
- * 间隔长的单词优先安排到较早的时间
- * @param words 要推迟的单词列表
- * @returns 已设置好分散复习时间的单词列表
+ * 将单词按优先级分散推迟到未来几天
+ * 高优先级（间隔长）的单词会安排在较近的时间
+ * @param words 要推迟的单词
+ * @returns 更新后的单词数组
  */
 export function postponeWithPriority(words: Word[]): Word[] {
   const now = Date.now();
   const oneDay = 24 * 60 * 60 * 1000;
   
-  // 按优先级排序（间隔长的优先，这样间隔长的会先被安排）
+  // 按优先级排序
   const sortedWords = sortByPriority(words);
   
   return sortedWords.map((word, index) => {
-    // 计算推迟天数：
-    // - 前1/3优先级的单词推迟1-2天
-    // - 中间1/3推迟2-4天
-    // - 后1/3推迟4-7天
+    // 根据优先级分配不同的推迟时间
     const totalWords = sortedWords.length;
-    const priorityLevel = index / totalWords; // 0 到 1
+    const position = index / totalWords; // 0 到 1 之间的值
     
     let minDays: number;
     let maxDays: number;
     
-    if (priorityLevel < 0.33) {
+    if (position < 0.33) {
       // 高优先级（间隔长）：1-2天
       minDays = 1;
       maxDays = 2;
-    } else if (priorityLevel < 0.66) {
+    } else if (position < 0.67) {
       // 中优先级：2-4天
       minDays = 2;
       maxDays = 4;
@@ -159,6 +149,7 @@ export function postponeWithPriority(words: Word[]): Word[] {
     return {
       ...word,
       nextReviewAt,
+      updatedAt: now,
     };
   });
 }
@@ -176,5 +167,6 @@ export function postponeToTomorrow(word: Word): Word {
   return {
     ...word,
     nextReviewAt: tomorrow,
+    updatedAt: now,
   };
 }

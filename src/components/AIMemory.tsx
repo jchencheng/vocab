@@ -1,11 +1,13 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
-import { db } from '../services';
+import { useAuth } from '../context/AuthContext';
+import { supabaseService } from '../services/supabaseService';
 import { formatDate, formatWithBionicReading } from '../utils';
 import type { AIContext } from '../types';
 
 export function AIMemory() {
   const { words } = useApp();
+  const { user } = useAuth();
   const [selectedWordIds, setSelectedWordIds] = useState<string[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState('');
@@ -16,13 +18,24 @@ export function AIMemory() {
   const [viewingContext, setViewingContext] = useState<AIContext | null>(null);
 
   const loadContexts = useCallback(async () => {
-    const allContexts = await db.getAllContexts();
-    setContexts(allContexts.sort((a, b) => b.createdAt - a.createdAt));
-  }, []);
+    if (!user) return;
+    try {
+      const allContexts = await supabaseService.getAllContexts(user.id);
+      setContexts(allContexts.sort((a, b) => b.createdAt - a.createdAt));
+    } catch (err) {
+      console.error('Error loading contexts:', err);
+      setError('Failed to load contexts');
+    }
+  }, [user]);
 
   const generateContext = useCallback(async () => {
     if (selectedWordIds.length === 0) {
       setError('Please select at least one word');
+      return;
+    }
+
+    if (!user) {
+      setError('Please sign in to generate stories');
       return;
     }
 
@@ -54,7 +67,7 @@ export function AIMemory() {
         createdAt: Date.now(),
       };
 
-      await db.addContext(newContext);
+      await supabaseService.addContext(newContext, user.id);
       await loadContexts();
       setShowContexts(true);
       setSelectedWordIds([]);
@@ -63,7 +76,7 @@ export function AIMemory() {
     } finally {
       setIsGenerating(false);
     }
-  }, [selectedWordIds, words, loadContexts]);
+  }, [selectedWordIds, words, user, loadContexts]);
 
   const toggleWord = useCallback((wordId: string) => {
     setSelectedWordIds(prev =>
@@ -74,9 +87,15 @@ export function AIMemory() {
   }, []);
 
   const handleDeleteContext = useCallback(async (contextId: string) => {
-    await db.deleteContext(contextId);
-    await loadContexts();
-  }, [loadContexts]);
+    if (!user) return;
+    try {
+      await supabaseService.deleteContext(contextId, user.id);
+      await loadContexts();
+    } catch (err) {
+      console.error('Error deleting context:', err);
+      setError('Failed to delete context');
+    }
+  }, [user, loadContexts]);
 
   const handleEdit = useCallback((context: AIContext) => {
     setEditingContext(context);
@@ -84,18 +103,23 @@ export function AIMemory() {
   }, []);
 
   const handleSaveEdit = useCallback(async () => {
-    if (!editingContext) return;
+    if (!editingContext || !user) return;
 
     const updatedContext: AIContext = {
       ...editingContext,
       content: editContent,
     };
 
-    await db.updateContext(updatedContext);
-    await loadContexts();
-    setEditingContext(null);
-    setEditContent('');
-  }, [editingContext, editContent, loadContexts]);
+    try {
+      await supabaseService.updateContext(updatedContext, user.id);
+      await loadContexts();
+      setEditingContext(null);
+      setEditContent('');
+    } catch (err) {
+      console.error('Error updating context:', err);
+      setError('Failed to update context');
+    }
+  }, [editingContext, editContent, user, loadContexts]);
 
   const handleCancelEdit = useCallback(() => {
     setEditingContext(null);

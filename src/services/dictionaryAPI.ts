@@ -1,125 +1,85 @@
-import type { Word, AppSettings } from '../types';
-import { DICTIONARY_API } from '../constants';
+import type { Word, Meaning, AppSettings } from '../types';
 import { extractJsonFromText } from '../utils';
 
-interface DictionaryEntry {
+interface FreeDictionaryEntry {
   word: string;
   phonetic?: string;
-  phonetics: Array<{ text?: string; audio?: string }>;
-  meanings: Array<{
+  phonetics?: { text?: string; audio?: string }[];
+  meanings: {
     partOfSpeech: string;
-    definitions: Array<{
+    definitions: {
       definition: string;
       example?: string;
       synonyms: string[];
       antonyms: string[];
-    }>;
+    }[];
     synonyms: string[];
     antonyms: string[];
-  }>;
+  }[];
 }
 
-async function translateWithGemini(text: string, settings: AppSettings): Promise<string> {
-  const apiUrl = settings.apiEndpoint?.includes('generateContent')
-    ? settings.apiEndpoint
-    : `${settings.apiEndpoint}:generateContent`;
-
-  const finalUrl = apiUrl.includes('?')
-    ? apiUrl
-    : `${apiUrl}?key=${settings.apiKey}`;
-
-  const response = await fetch(finalUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{
-        parts: [{
-          text: `Translate the following English text to Chinese: ${text}`,
-        }],
-      }],
-    }),
-  });
-
+export async function fetchFromDictionaryAPI(word: string): Promise<FreeDictionaryEntry> {
+  const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`);
+  
   if (!response.ok) {
-    throw new Error('Translation failed');
+    throw new Error(`Dictionary API error: ${response.status}`);
   }
-
+  
   const data = await response.json();
-  return data.candidates[0].content.parts[0].text;
+  return data[0];
 }
 
-async function translateWithOpenAI(text: string, settings: AppSettings): Promise<string> {
-  const response = await fetch(settings.apiEndpoint!, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${settings.apiKey}`,
-    },
-    body: JSON.stringify({
-      model: settings.model || 'gpt-3.5-turbo',
-      messages: [{
-        role: 'user',
-        content: `Translate the following English text to Chinese: ${text}`,
-      }],
-      temperature: 0.7,
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error('Translation failed');
-  }
-
-  const data = await response.json();
-  return data.choices[0].message.content;
-}
-
-export async function translateText(text: string, settings?: AppSettings): Promise<string> {
-  if (!settings?.apiKey || !settings?.apiEndpoint) {
-    return text;
+async function translateMeanings(
+  meanings: Meaning[],
+  settings?: AppSettings
+): Promise<Meaning[]> {
+  // If no API key is configured, return meanings without Chinese translations
+  if (!settings?.apiKey) {
+    return meanings.map(meaning => ({
+      ...meaning,
+      definitions: meaning.definitions.map(def => ({
+        ...def,
+        chineseDefinition: undefined,
+      })),
+    }));
   }
 
   try {
-    const isGeminiAPI = settings.apiEndpoint.includes('generativelanguage.googleapis.com');
-    return isGeminiAPI
-      ? await translateWithGemini(text, settings)
-      : await translateWithOpenAI(text, settings);
+    const definitions = meanings.flatMap(m => 
+      m.definitions.map(d => d.definition)
+    );
+    
+    const prompt = `Translate these English definitions to Chinese (simplified). Return ONLY a JSON array of strings in the same order:
+${JSON.stringify(definitions, null, 2)}`;
+
+    const response = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Translation API error');
+    }
+
+    const data = await response.json();
+    const translations = JSON.parse(data.content);
+
+    let index = 0;
+    return meanings.map(meaning => ({
+      ...meaning,
+      definitions: meaning.definitions.map(def => ({
+        ...def,
+        chineseDefinition: translations[index++] || undefined,
+      })),
+    }));
   } catch (error) {
-    console.error('Error translating text:', error);
-    return text;
+    console.error('Translation error:', error);
+    return meanings;
   }
 }
 
-function generateDictionaryPrompt(word: string): string {
-  return `Generate a comprehensive dictionary entry for the word "${word}". Include:
-1. The word itself
-2. Phonetic transcription (using IPA)
-3. Multiple meanings with part of speech
-4. For each meaning, provide:
-   - Clear definition in English
-   - Chinese translation of the definition
-   - Example sentence
-5. Return the data in JSON format with the following structure:
-{
-  "word": "${word}",
-  "phonetic": "[IPA transcription]",
-  "meanings": [
-    {
-      "partOfSpeech": "[part of speech]",
-      "definitions": [
-        {
-          "definition": "[English definition]",
-          "chineseDefinition": "[Chinese translation]",
-          "example": "[Example sentence]"
-        }
-      ]
-    }
-  ]
-}
-
-Make sure the JSON is valid and well-formatted.`;
-}
-
-function parseWordData(content: string): Omit<Word, 'id' | 'tags' | 'createdAt' | 'nextReviewAt' | 'reviewCount' | 'easeFactor' | 'interval' | 'quality'> {
+function parseWordData(content: string): Omit<Word, 'id' | 'tags' | 'createdAt' | 'updatedAt' | 'nextReviewAt' | 'reviewCount' | 'easeFactor' | 'interval' | 'quality'> {
   const jsonStr = extractJsonFromText(content);
   if (!jsonStr) {
     throw new Error('Invalid JSON response from API');
@@ -144,145 +104,99 @@ function parseWordData(content: string): Omit<Word, 'id' | 'tags' | 'createdAt' 
   };
 }
 
-async function generateWithVercelAPI(word: string): Promise<Omit<Word, 'id' | 'tags' | 'createdAt' | 'nextReviewAt' | 'reviewCount' | 'easeFactor' | 'interval' | 'quality'>> {
+async function generateWithVercelAPI(word: string): Promise<Omit<Word, 'id' | 'tags' | 'createdAt' | 'updatedAt' | 'nextReviewAt' | 'reviewCount' | 'easeFactor' | 'interval' | 'quality'>> {
   const response = await fetch('/api/generate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      prompt: generateDictionaryPrompt(word),
-      wordList: [word],
+      prompt: `Provide a detailed dictionary definition for the word "${word}" in JSON format with the following structure:
+{
+  "word": "${word}",
+  "phonetic": "/phonetic/",
+  "meanings": [
+    {
+      "partOfSpeech": "noun|verb|adjective|adverb|etc",
+      "definitions": [
+        {
+          "definition": "clear English definition",
+          "example": "example sentence",
+          "chineseDefinition": "中文释义"
+        }
+      ]
+    }
+  ]
+}
+Include at least 2 meanings with different parts of speech if applicable.`,
     }),
   });
 
   if (!response.ok) {
-    throw new Error('API request failed');
+    throw new Error(`API error: ${response.status}`);
   }
 
   const data = await response.json();
   return parseWordData(data.content);
 }
 
-async function generateWithSettings(
-  word: string,
-  settings: AppSettings
-): Promise<Omit<Word, 'id' | 'tags' | 'createdAt' | 'nextReviewAt' | 'reviewCount' | 'easeFactor' | 'interval' | 'quality'>> {
-  const isGeminiAPI = settings.apiEndpoint!.includes('generativelanguage.googleapis.com');
-
-  let response;
-  if (isGeminiAPI) {
-    const apiUrl = settings.apiEndpoint!.includes('generateContent')
-      ? settings.apiEndpoint
-      : `${settings.apiEndpoint}:generateContent`;
-    const finalUrl = apiUrl!.includes('?')
-      ? apiUrl
-      : `${apiUrl}?key=${settings.apiKey}`;
-
-    response = await fetch(finalUrl!, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{
-          parts: [{
-            text: generateDictionaryPrompt(word),
-          }],
-        }],
-      }),
-    });
-  } else {
-    response = await fetch(settings.apiEndpoint!, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${settings.apiKey}`,
-      },
-      body: JSON.stringify({
-        model: settings.model || 'gpt-3.5-turbo',
-        messages: [{
-          role: 'user',
-          content: generateDictionaryPrompt(word),
-        }],
-        temperature: 0.7,
-      }),
-    });
-  }
-
-  if (!response.ok) {
-    throw new Error('API request failed');
-  }
-
-  const data = await response.json();
-  const content = isGeminiAPI
-    ? data.candidates[0].content.parts[0].text
-    : data.choices[0].message.content;
-
-  return parseWordData(content);
-}
-
-export async function generateWordDefinition(
+async function generateWordDefinition(
   word: string,
   settings?: AppSettings
-): Promise<Omit<Word, 'id' | 'tags' | 'createdAt' | 'nextReviewAt' | 'reviewCount' | 'easeFactor' | 'interval' | 'quality'>> {
-  if (settings?.apiKey && settings?.apiEndpoint) {
-    try {
-      return await generateWithSettings(word, settings);
-    } catch (error) {
-      console.error('Error generating word definition with settings:', error);
-      throw error;
-    }
-  }
-
+): Promise<Omit<Word, 'id' | 'tags' | 'createdAt' | 'updatedAt' | 'nextReviewAt' | 'reviewCount' | 'easeFactor' | 'interval' | 'quality'>> {
+  // Try Vercel API first
   try {
     return await generateWithVercelAPI(word);
   } catch (error) {
-    console.error('Error generating word definition with Vercel API:', error);
-    throw error;
+    console.error('Vercel API error:', error);
   }
-}
 
-async function fetchFromDictionaryAPI(word: string): Promise<DictionaryEntry> {
-  const response = await fetch(`${DICTIONARY_API}/${encodeURIComponent(word)}`);
+  // Fallback to direct Gemini API
+  const apiKey = settings?.apiKey;
+  if (!apiKey) {
+    throw new Error('No API key configured');
+  }
+
+  const prompt = `Provide a detailed dictionary definition for the word "${word}" in JSON format with the following structure:
+{
+  "word": "${word}",
+  "phonetic": "/phonetic/",
+  "meanings": [
+    {
+      "partOfSpeech": "noun|verb|adjective|adverb|etc",
+      "definitions": [
+        {
+          "definition": "clear English definition",
+          "example": "example sentence",
+          "chineseDefinition": "中文释义"
+        }
+      ]
+    }
+  ]
+}
+Include at least 2 meanings with different parts of speech if applicable.`;
+
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{
+        parts: [{ text: prompt }]
+      }]
+    }),
+  });
 
   if (!response.ok) {
-    throw new Error('Word not found');
+    throw new Error(`API error: ${response.status}`);
   }
 
   const data = await response.json();
-  return data[0];
-}
-
-async function translateMeanings(
-  meanings: DictionaryEntry['meanings'],
-  settings?: AppSettings
-): Promise<DictionaryEntry['meanings']> {
-  if (!settings?.apiKey || !settings?.apiEndpoint) {
-    return meanings;
-  }
-
-  const translatedMeanings = await Promise.all(
-    meanings.map(async (meaning) => {
-      const definitions = await Promise.all(
-        meaning.definitions.map(async (def) => {
-          const chineseDefinition = await translateText(def.definition, settings);
-          return {
-            ...def,
-            chineseDefinition,
-          };
-        })
-      );
-      return {
-        ...meaning,
-        definitions,
-      };
-    })
-  );
-
-  return translatedMeanings;
+  const content = data.candidates[0].content.parts[0].text;
+  return parseWordData(content);
 }
 
 export async function fetchWord(
   word: string,
   settings?: AppSettings
-): Promise<Omit<Word, 'id' | 'tags' | 'createdAt' | 'nextReviewAt' | 'reviewCount' | 'easeFactor' | 'interval' | 'quality'>> {
+): Promise<Omit<Word, 'id' | 'tags' | 'createdAt' | 'updatedAt' | 'nextReviewAt' | 'reviewCount' | 'easeFactor' | 'interval' | 'quality'>> {
   try {
     return await generateWordDefinition(word, settings);
   } catch (error) {

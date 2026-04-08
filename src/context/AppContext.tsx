@@ -1,7 +1,8 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import type { ReactNode } from 'react';
 import type { Word, AppSettings, ReviewStats } from '../types';
-import { db } from '../services';
+import { supabaseService } from '../services/supabaseService';
+import { useAuth } from './AuthContext';
 import { calculateStats } from '../utils';
 
 interface AppContextType {
@@ -21,35 +22,65 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export function AppProvider({ children }: { children: ReactNode }) {
+  const { user, isAuthenticated } = useAuth();
   const [words, setWords] = useState<Word[]>([]);
   const [settings, setSettings] = useState<AppSettings>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState(false);
 
   const refreshWords = useCallback(async () => {
-    const allWords = await db.getAllWords();
-    setWords(allWords);
-  }, []);
+    if (!user) return;
+    try {
+      const allWords = await supabaseService.getAllWords(user.id);
+      setWords(allWords);
+    } catch (error) {
+      console.error('Error refreshing words:', error);
+    }
+  }, [user]);
 
   const addWord = useCallback(async (word: Word) => {
-    await db.addWord(word);
-    await refreshWords();
-  }, [refreshWords]);
+    if (!user) return;
+    try {
+      await supabaseService.addWord(word, user.id);
+      await refreshWords();
+    } catch (error) {
+      console.error('Error adding word:', error);
+      throw error;
+    }
+  }, [user, refreshWords]);
 
   const updateWord = useCallback(async (word: Word) => {
-    await db.updateWord(word);
-    await refreshWords();
-  }, [refreshWords]);
+    if (!user) return;
+    try {
+      await supabaseService.updateWord(word, user.id);
+      await refreshWords();
+    } catch (error) {
+      console.error('Error updating word:', error);
+      throw error;
+    }
+  }, [user, refreshWords]);
 
   const deleteWord = useCallback(async (id: string) => {
-    await db.deleteWord(id);
-    await refreshWords();
-  }, [refreshWords]);
+    if (!user) return;
+    try {
+      await supabaseService.deleteWord(id, user.id);
+      await refreshWords();
+    } catch (error) {
+      console.error('Error deleting word:', error);
+      throw error;
+    }
+  }, [user, refreshWords]);
 
   const saveSettings = useCallback(async (newSettings: AppSettings) => {
-    await db.saveSettings(newSettings);
-    setSettings(newSettings);
-  }, []);
+    if (!user) return;
+    try {
+      await supabaseService.saveSettings(newSettings, user.id);
+      setSettings(newSettings);
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      throw error;
+    }
+  }, [user]);
 
   const toggleDarkMode = useCallback(async () => {
     const newDarkMode = !isDarkMode;
@@ -66,23 +97,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [isDarkMode]);
 
   useEffect(() => {
-    async function initDB() {
+    async function loadData() {
+      if (!isAuthenticated || !user) {
+        setIsLoading(false);
+        return;
+      }
+
       try {
-        await db.init();
+        setIsLoading(true);
         await refreshWords();
-        const savedSettings = await db.getSettings();
+        const savedSettings = await supabaseService.getSettings(user.id);
         if (savedSettings) {
           setSettings(savedSettings);
           setIsDarkMode(savedSettings.darkMode || false);
         }
       } catch (error) {
-        console.error('Error initializing DB:', error);
+        console.error('Error loading data:', error);
       } finally {
         setIsLoading(false);
       }
     }
-    initDB();
-  }, [refreshWords]);
+    loadData();
+  }, [isAuthenticated, user, refreshWords]);
 
   const value = useMemo(() => ({
     words,

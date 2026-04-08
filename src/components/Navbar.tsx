@@ -1,4 +1,5 @@
 import { useApp } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
 import { TABS } from '../constants';
 
 interface NavbarProps {
@@ -8,6 +9,11 @@ interface NavbarProps {
 
 export function Navbar({ activeTab, onTabChange }: NavbarProps) {
   const { isDarkMode, toggleDarkMode } = useApp();
+  const { user, signOut } = useAuth();
+
+  const handleSignOut = async () => {
+    await signOut();
+  };
 
   return (
     <nav className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-50 dark:bg-gray-900 dark:border-gray-800">
@@ -19,7 +25,7 @@ export function Navbar({ activeTab, onTabChange }: NavbarProps) {
               VocabMaster
             </h1>
           </div>
-          <div className="flex gap-0.5 sm:gap-1">
+          <div className="flex gap-0.5 sm:gap-1 items-center">
             {TABS.map((tab) => (
               <button
                 key={tab.id}
@@ -45,6 +51,23 @@ export function Navbar({ activeTab, onTabChange }: NavbarProps) {
               <span className="text-lg">{isDarkMode ? '☀️' : '🌙'}</span>
               <span className="hidden sm:inline">{isDarkMode ? 'Light' : 'Dark'}</span>
             </button>
+            
+            {/* User Info & Logout */}
+            {user && (
+              <div className="flex items-center gap-2 ml-2 pl-2 border-l border-gray-200 dark:border-gray-700">
+                <span className="hidden md:block text-sm text-gray-600 dark:text-gray-400 truncate max-w-[120px]">
+                  {user.email}
+                </span>
+                <button
+                  onClick={handleSignOut}
+                  className="px-2 sm:px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-1 sm:gap-2 text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                  title="Sign Out"
+                >
+                  <span className="text-lg">🚪</span>
+                  <span className="hidden sm:inline">Logout</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
