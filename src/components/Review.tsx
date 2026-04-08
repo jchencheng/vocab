@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { calculateNextReview, getTodayReviewQueue, postponeToTomorrow, getChineseDefinition, playAudio, hasAudio } from '../utils';
+import { calculateNextReview, getTodayReviewQueue, postponeWithPriority, getChineseDefinition, playAudio, hasAudio } from '../utils';
 import { DEFAULT_MAX_DAILY_REVIEWS } from '../constants';
 import type { ReviewMode } from '../types';
 
@@ -19,15 +19,15 @@ export function Review() {
     return getTodayReviewQueue(words, maxDailyReviews);
   }, [words, maxDailyReviews]);
 
-  // 组件加载时，自动推迟超出限制的单词
+  // 组件加载时，自动推迟超出限制的单词（使用优先级分散策略）
   useEffect(() => {
     async function postponeExtraWords() {
       if (postponedWords.length > 0 && !isPostponing) {
         setIsPostponing(true);
-        // 将超出限制的单词推迟到明天
-        for (const word of postponedWords) {
-          const postponedWord = postponeToTomorrow(word);
-          await updateWord(postponedWord);
+        // 将超出限制的单词按优先级分散推迟
+        const postponedWithTime = postponeWithPriority(postponedWords);
+        for (const word of postponedWithTime) {
+          await updateWord(word);
         }
         setIsPostponing(false);
       }
@@ -74,7 +74,7 @@ export function Review() {
           </p>
           {postponedWords.length > 0 && (
             <p className="text-sm text-gray-500 dark:text-gray-500 mb-4">
-              {postponedWords.length} words postponed to tomorrow
+              {postponedWords.length} words scheduled for future days
             </p>
           )}
           <button
@@ -99,7 +99,7 @@ export function Review() {
           </p>
           {postponedWords.length > 0 && (
             <p className="text-sm text-gray-500 dark:text-gray-500 mb-8">
-              {postponedWords.length} words postponed to tomorrow
+              {postponedWords.length} words scheduled for future days
             </p>
           )}
           <button
@@ -135,7 +135,7 @@ export function Review() {
           {currentIndex + 1} of {todayQueue.length}
           {postponedWords.length > 0 && (
             <span className="text-sm text-gray-500 dark:text-gray-500 ml-2">
-              (+{postponedWords.length} postponed)
+              (+{postponedWords.length} scheduled)
             </span>
           )}
         </p>
