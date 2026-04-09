@@ -104,12 +104,17 @@ async function callZhipu(prompt: string) {
       model: model.name,
       messages: [
         {
+          role: 'system',
+          content: '你是一个有用的AI助手。'
+        },
+        {
           role: 'user',
           content: prompt,
         },
       ],
+      stream: false,
+      temperature: 1,
       max_tokens: 65536,
-      temperature: 0.7,
     }),
   }, API_TIMEOUT);
 
