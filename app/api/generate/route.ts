@@ -166,9 +166,11 @@ async function callGoogle(prompt: string) {
 
 // 尝试使用多个模型，实现故障转移
 async function tryMultipleModels(prompt: string, preferredModel?: string) {
+  // 构建模型尝试顺序：首选模型 -> 其他模型（无重复）
+  const allModels = ['siliconflow', 'zhipu', 'google'];
   const modelsToTry = preferredModel 
-    ? [preferredModel, 'zhipu', 'google']
-    : ['siliconflow', 'zhipu', 'google'];
+    ? [preferredModel, ...allModels.filter(m => m !== preferredModel)]
+    : allModels;
 
   let lastError: Error | null = null;
 
