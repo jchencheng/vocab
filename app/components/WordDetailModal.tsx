@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
 import { useWordEditor } from '../hooks/useWordEditor';
 import { getIntervalText, playAudio, hasAudio, parseTags } from '../utils/formatters';
-import { generateContent } from '../services/apiClient';
+import { fetchWordFromDictionary, translateDefinitionsToChinese } from '../services/dictionaryAPI';
 import type { Word } from '../types';
 
 interface WordDetailModalProps {
@@ -18,8 +18,8 @@ export function WordDetailModal({ word, onClose, onDelete }: WordDetailModalProp
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isLoadingDefinition, setIsLoadingDefinition] = useState(false);
+  const [isTranslating, setIsTranslating] = useState(false);
   const [error, setError] = useState('');
-  const [selectedModel, setSelectedModel] = useState<string>('siliconflow');
   const [modelMessage, setModelMessage] = useState('');
 
   const editor = useWordEditor({ initialWord: word });
@@ -28,6 +28,7 @@ export function WordDetailModal({ word, onClose, onDelete }: WordDetailModalProp
     playAudio(word.phonetics);
   }, [word.phonetics]);
 
+  // 从 Free Dictionary API 获取英文释义
   const handleGetDefinitions = useCallback(async () => {
     if (!editor.editWord.trim()) return;
 
@@ -36,62 +37,81 @@ export function WordDetailModal({ word, onClose, onDelete }: WordDetailModalProp
     setModelMessage('');
 
     try {
-      const prompt = `Provide a detailed dictionary definition for the word "${editor.editWord}" in JSON format with the following structure:
-{
-  "word": "${editor.editWord}",
-  "phonetic": "/phonetic/",
-  "meanings": [
-    {
-      "partOfSpeech": "noun|verb|adjective|adverb|etc",
-      "definitions": [
-        {
-          "definition": "clear English definition",
-          "example": "example sentence",
-          "chineseDefinition": "中文释义"
-        }
-      ]
-    }
-  ]
-}
-Include at least 2 meanings with different parts of speech if applicable.`;
-
-      const response = await generateContent(prompt, undefined, selectedModel);
-      const content = response.content;
+      const wordData = await fetchWordFromDictionary(editor.editWord.trim());
       
-      // 显示使用的模型
-      if (response.model) {
-        setModelMessage(`使用 ${response.model} 生成释义`);
-      }
-
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const wordData = JSON.parse(jsonMatch[0]);
-
+      if (wordData) {
         editor.setEditPhonetic(wordData.phonetic || '');
-        editor.setEditMeanings(
-          wordData.meanings.map((m: any) => ({
-            partOfSpeech: m.partOfSpeech,
-            definitions: m.definitions.map((d: any) => ({
-              definition: d.definition,
-              example: d.example || '',
-              chineseDefinition: d.chineseDefinition,
-              synonyms: [],
-              antonyms: [],
-            })),
-            synonyms: [],
-            antonyms: [],
-          }))
-        );
+        editor.setEditMeanings(wordData.meanings);
+        setModelMessage(`已从 Free Dictionary API 获取释义`);
       } else {
-        setError('Failed to parse word definition');
+        setError('未找到该单词的释义');
       }
     } catch (err: any) {
       console.error('Error fetching definition:', err);
-      setError('Failed to fetch definition: ' + err.message);
+      setError('获取释义失败: ' + err.message);
     } finally {
       setIsLoadingDefinition(false);
     }
-  }, [editor, selectedModel]);
+  }, [editor]);
+
+  // 翻译中文释义
+  const handleTranslateChinese = useCallback(async () => {
+    const meanings = editor.editMeanings;
+    if (meanings.every(m => m.definitions.every(d => d.chineseDefinition))) {
+      setError('所有释义已有中文翻译');
+      return;
+    }
+
+    setIsTranslating(true);
+    setError('');
+    setModelMessage('');
+
+    try {
+      // 收集所有需要翻译的释义
+      const definitionsToTranslate: { meaningIndex: number; defIndex: number; definition: string; example: string }[] = [];
+      
+      meanings.forEach((meaning, mIndex) => {
+        meaning.definitions.forEach((def, dIndex) => {
+          if (!def.chineseDefinition && def.definition) {
+            definitionsToTranslate.push({
+              meaningIndex: mIndex,
+              defIndex: dIndex,
+              definition: def.definition,
+              example: def.example,
+            });
+          }
+        });
+      });
+
+      if (definitionsToTranslate.length === 0) {
+        setError('没有需要翻译的释义');
+        setIsTranslating(false);
+        return;
+      }
+
+      // 调用百度翻译 API
+      const translations = await translateDefinitionsToChinese(
+        definitionsToTranslate.map(d => ({ definition: d.definition, example: d.example }))
+      );
+
+      // 更新中文释义
+      const newMeanings = [...meanings];
+      definitionsToTranslate.forEach((item, index) => {
+        const translation = translations[index];
+        if (translation && translation.chineseDefinition) {
+          newMeanings[item.meaningIndex].definitions[item.defIndex].chineseDefinition = translation.chineseDefinition;
+        }
+      });
+      
+      editor.setEditMeanings(newMeanings);
+      setModelMessage('已使用百度翻译完成中文释义');
+    } catch (err: any) {
+      console.error('Error translating:', err);
+      setError('翻译失败: ' + err.message);
+    } finally {
+      setIsTranslating(false);
+    }
+  }, [editor]);
 
   const handleSave = useCallback(async () => {
     const tags = parseTags(editor.editTags);
@@ -149,18 +169,6 @@ Include at least 2 meanings with different parts of speech if applicable.`;
                       className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 dark:text-white rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
                     />
                   </div>
-                  <div className="mt-3">
-                    <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">优先模型</label>
-                    <select
-                      value={selectedModel}
-                      onChange={(e) => setSelectedModel(e.target.value)}
-                      className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 dark:text-white rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
-                    >
-                      <option value="siliconflow">SiliconFlow Tencent Hunyuan MT-7B (默认)</option>
-                      <option value="zhipu">智谱 GLM-4.7-Flash</option>
-                      <option value="google">Google Gemini</option>
-                    </select>
-                  </div>
                   {error && (
                     <div className="mt-3 p-3 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800/50 rounded-2xl text-rose-600 dark:text-rose-400 text-sm flex items-center gap-2">
                       <span>⚠️</span>
@@ -173,23 +181,42 @@ Include at least 2 meanings with different parts of speech if applicable.`;
                       {modelMessage}
                     </div>
                   )}
-                  <button
-                    onClick={handleGetDefinitions}
-                    disabled={!editor.editWord.trim() || isLoadingDefinition}
-                    className="w-full px-4 py-3 bg-gradient-to-r from-primary-600 to-accent-600 text-white rounded-2xl font-semibold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-soft flex items-center justify-center gap-2"
-                  >
-                    {isLoadingDefinition ? (
-                      <>
-                        <span className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full" />
-                        Getting definitions...
-                      </>
-                    ) : (
-                      <>
-                        <span>🔍</span>
-                        Get Definitions
-                      </>
-                    )}
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleGetDefinitions}
+                      disabled={!editor.editWord.trim() || isLoadingDefinition}
+                      className="flex-1 px-4 py-3 bg-gradient-to-r from-primary-600 to-accent-600 text-white rounded-2xl font-semibold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-soft flex items-center justify-center gap-2"
+                    >
+                      {isLoadingDefinition ? (
+                        <>
+                          <span className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full" />
+                          Getting definitions...
+                        </>
+                      ) : (
+                        <>
+                          <span>🔍</span>
+                          Get Definitions
+                        </>
+                      )}
+                    </button>
+                    <button
+                      onClick={handleTranslateChinese}
+                      disabled={isTranslating}
+                      className="px-4 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-2xl font-semibold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-soft flex items-center justify-center gap-2"
+                    >
+                      {isTranslating ? (
+                        <>
+                          <span className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full" />
+                          Translating...
+                        </>
+                      ) : (
+                        <>
+                          <span>🌐</span>
+                          Translate
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div>

@@ -48,6 +48,7 @@ export function formatContentWithHighlights(content: string): ContentPart[] {
 }
 
 export function extractJsonFromText(text: string): string | null {
+  // 尝试找到JSON对象
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {
     return null;
@@ -55,8 +56,29 @@ export function extractJsonFromText(text: string): string | null {
   
   let jsonStr = jsonMatch[0];
   
-  // 修复 phonetic 字段的格式问题：将 /phonetic/ 转换为 "/phonetic/"
+  // 1. 先处理转义字符问题，避免后续处理时被干扰
+  jsonStr = jsonStr.replace(/(["\\])/g, '\\$1');
+  
+  // 2. 修复语音字段格式问题（支持各种拼写和格式）
+  // 处理 phonetic 字段
   jsonStr = jsonStr.replace(/"phonetic":\s*(\/[^\/]+\/)/g, '"phonetic": "$1"');
+  // 处理 pronunciation 字段
+  jsonStr = jsonStr.replace(/"pronunciation":\s*(\/[^\/]+\/)/g, '"pronunciation": "$1"');
+  
+  // 3. 修复所有可能的正则表达式格式值
+  jsonStr = jsonStr.replace(/"([a-zA-Z_]+)":\s*(\/[^\/]+\/)/g, '"$1": "$2"');
+  
+  // 4. 确保所有字符串值都有引号
+  jsonStr = jsonStr.replace(/([{,])\s*("[a-zA-Z_]+"\s*:\s*)([^"\s\{\}\[,\]\:])([^"\s\{\}\[,\]\:]*)(\s*[},])/g, '$1$2"$3$4"$5');
+  
+  // 5. 特别处理数字、布尔值和null
+  jsonStr = jsonStr.replace(/"(\d+\.?\d*)"/g, '$1');
+  jsonStr = jsonStr.replace(/"(true|false)"/g, '$1');
+  jsonStr = jsonStr.replace(/"(null)"/g, '$1');
+  
+  // 6. 确保JSON格式正确（添加缺失的逗号等）
+  jsonStr = jsonStr.replace(/([}\]])(\s*)([{\[])/g, '$1,$2$3');
+  jsonStr = jsonStr.replace(/([,{])(\s*)(})/g, '$1$2');
   
   return jsonStr;
 }

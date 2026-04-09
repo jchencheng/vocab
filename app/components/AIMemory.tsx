@@ -19,6 +19,7 @@ export function AIMemory() {
   const [activeTab, setActiveTab] = useState<'generate' | 'history'>('generate');
   const [showBionic, setShowBionic] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [historyBionicStates, setHistoryBionicStates] = useState<Record<string, boolean>>({});
 
   const toggleWordSelection = useCallback((wordId: string) => {
     setSelectedWords(prev => {
@@ -134,41 +135,90 @@ Format your response as a JSON object with this structure:
     }
   }, [deleteContext, paginatedContexts.length, currentPage]);
 
-  const renderContent = (content: string) => {
-    if (!showBionic) {
-      return content.split(/(\*\*[^*]+\*\*)/g).map((part, idx) => {
-        if (part.startsWith('**') && part.endsWith('**')) {
-          const inner = part.slice(2, -2);
-          const wordMatch = inner.match(/^([^（\(]+)([（\(].*)$/);
-          if (wordMatch) {
-            const [, word, def] = wordMatch;
-            return (
-              <span key={idx} className="inline-flex flex-wrap items-baseline gap-1">
-                <span className="bg-amber-100 dark:bg-amber-900/40 px-2 py-0.5 rounded-lg font-semibold text-amber-900 dark:text-amber-200 border border-amber-200 dark:border-amber-800/30">
-                  {word.trim()}
-                </span>
-                <span className="text-accent-600 dark:text-accent-400 text-sm">{def}</span>
-              </span>
-            );
-          }
-          return <span key={idx} className="bg-amber-100 dark:bg-amber-900/40 px-2 py-0.5 rounded-lg font-semibold text-amber-900 dark:text-amber-200">{inner}</span>;
+  const toggleHistoryBionic = useCallback((contextId: string) => {
+    setHistoryBionicStates(prev => ({
+      ...prev,
+      [contextId]: !prev[contextId]
+    }));
+  }, []);
+
+  const renderContent = (content: string, isHistoryBionic?: boolean) => {
+    // 首先处理高亮标记 (**word**)
+    const highlightedParts = content.split(/(\*\*[^*]+\*\*)/g).map((part, idx) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        const inner = part.slice(2, -2);
+        const wordMatch = inner.match(/^([^（\(]+)([（\(].*)$/);
+        if (wordMatch) {
+          const [, word, def] = wordMatch;
+          return {
+            type: 'highlight' as const,
+            word: word.trim(),
+            definition: def,
+            key: idx,
+          };
         }
-        return <span key={idx}>{part}</span>;
+        return {
+          type: 'highlight' as const,
+          word: inner,
+          definition: '',
+          key: idx,
+        };
+      }
+      return {
+        type: 'text' as const,
+        content: part,
+        key: idx,
+      };
+    });
+
+    // 如果启用了 Bionic Reading（生成区域或历史区域），对每个部分应用 Bionic Reading 处理
+    const shouldShowBionic = isHistoryBionic !== undefined ? isHistoryBionic : showBionic;
+    if (shouldShowBionic) {
+      return highlightedParts.map((part) => {
+        if (part.type === 'highlight') {
+          // 对高亮单词应用 Bionic Reading，并保留高亮样式
+          const bionicWord = formatWithBionicReading(part.word)
+            .map(p => p.content)
+            .join('');
+          return (
+            <span key={part.key} className="inline-flex flex-wrap items-baseline gap-1">
+              <span 
+                className="bg-amber-100 dark:bg-amber-900/40 px-2 py-0.5 rounded-lg font-semibold text-amber-900 dark:text-amber-200 border border-amber-200 dark:border-amber-800/30"
+                dangerouslySetInnerHTML={{ __html: bionicWord }}
+              />
+              {part.definition && (
+                <span className="text-accent-600 dark:text-accent-400 text-sm">{part.definition}</span>
+              )}
+            </span>
+          );
+        }
+        // 对普通文本应用 Bionic Reading
+        const bionicParts = formatWithBionicReading(part.content);
+        return bionicParts.map((p, pIdx) => (
+          <span
+            key={`${part.key}-${pIdx}`}
+            dangerouslySetInnerHTML={{ __html: p.content }}
+            className={p.type === 'bionic' ? 'bionic-text' : ''}
+          />
+        ));
       });
     }
 
-    const parts = formatWithBionicReading(content);
-    return parts.map((part, idx) => {
-      if (part.type === 'bionic') {
+    // 不启用 Bionic Reading 时的渲染
+    return highlightedParts.map((part) => {
+      if (part.type === 'highlight') {
         return (
-          <span
-            key={idx}
-            dangerouslySetInnerHTML={{ __html: part.content }}
-            className="bionic-text"
-          />
+          <span key={part.key} className="inline-flex flex-wrap items-baseline gap-1">
+            <span className="bg-amber-100 dark:bg-amber-900/40 px-2 py-0.5 rounded-lg font-semibold text-amber-900 dark:text-amber-200 border border-amber-200 dark:border-amber-800/30">
+              {part.word}
+            </span>
+            {part.definition && (
+              <span className="text-accent-600 dark:text-accent-400 text-sm">{part.definition}</span>
+            )}
+          </span>
         );
       }
-      return <span key={idx}>{part.content}</span>;
+      return <span key={part.key}>{part.content}</span>;
     });
   };
 
@@ -368,7 +418,16 @@ Format your response as a JSON object with this structure:
                                 {context.wordIds.length} words
                               </span>
                             </div>
-                            <div className="flex gap-2">
+                            <div className="flex items-center gap-2">
+                              <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400 cursor-pointer font-medium mr-2">
+                                <input
+                                  type="checkbox"
+                                  checked={historyBionicStates[context.id] || false}
+                                  onChange={() => toggleHistoryBionic(context.id)}
+                                  className="w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-primary-600 focus:ring-primary-500"
+                                />
+                                Bionic
+                              </label>
                               <button
                                 onClick={() => handleEditContext(context)}
                                 className="p-2 text-primary-600 dark:text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-900/20 rounded-xl transition-colors"
@@ -386,7 +445,7 @@ Format your response as a JSON object with this structure:
                             </div>
                           </div>
                           <div className="text-slate-700 dark:text-slate-300 leading-relaxed text-base">
-                            {renderContent(context.content)}
+                            {renderContent(context.content, historyBionicStates[context.id] || false)}
                           </div>
                         </>
                       )}

@@ -3,6 +3,10 @@
 1. vercel-react-best-practices
 2. vercel-composition-patterns
 
+## 除非特别说明，禁止以下行为：
+
+- 修改代码中的大模型名称
+
 # 代码有重要修改时，必须要向我确认，包括不限于：
 
 - [ ] 算法实现
@@ -15,4 +19,4 @@
 
 - web-design-guidelines
 
-# 敏感信息在任何情况下都不能提交到github等平台。
+#

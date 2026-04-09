@@ -80,28 +80,39 @@ ${JSON.stringify(definitions, null, 2)}`;
 }
 
 function parseWordData(content: string): Omit<Word, 'id' | 'tags' | 'createdAt' | 'updatedAt' | 'nextReviewAt' | 'reviewCount' | 'easeFactor' | 'interval' | 'quality'> {
+  console.log('Raw API response:', content);
+  
   const jsonStr = extractJsonFromText(content);
+  console.log('Extracted JSON string:', jsonStr);
+  
   if (!jsonStr) {
     throw new Error('Invalid JSON response from API');
   }
 
-  const wordData = JSON.parse(jsonStr);
-
-  return {
-    word: wordData.word,
-    phonetic: wordData.phonetic,
-    phonetics: [],
-    meanings: wordData.meanings.map((meaning: any) => ({
-      ...meaning,
-      definitions: meaning.definitions.map((def: any) => ({
-        ...def,
+  try {
+    const wordData = JSON.parse(jsonStr);
+    console.log('Parsed word data:', wordData);
+    
+    return {
+      word: wordData.word,
+      phonetic: wordData.phonetic || wordData.honetic, // 支持拼写错误的字段
+      phonetics: [],
+      meanings: wordData.meanings.map((meaning: any) => ({
+        ...meaning,
+        definitions: meaning.definitions.map((def: any) => ({
+          ...def,
+          synonyms: [],
+          antonyms: [],
+        })),
         synonyms: [],
         antonyms: [],
       })),
-      synonyms: [],
-      antonyms: [],
-    })),
-  };
+    };
+  } catch (error) {
+    console.error('JSON parsing error:', error);
+    console.error('Invalid JSON string:', jsonStr);
+    throw new Error('Failed to parse JSON response');
+  }
 }
 
 async function generateWithVercelAPI(word: string): Promise<Omit<Word, 'id' | 'tags' | 'createdAt' | 'updatedAt' | 'nextReviewAt' | 'reviewCount' | 'easeFactor' | 'interval' | 'quality'>> {
