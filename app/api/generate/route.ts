@@ -21,7 +21,7 @@ const MODELS = {
   },
   GOOGLE: {
     name: 'gemini-3-flash-preview',
-    endpoint: 'https://generativelanguage.googleapis.com/v1/models/gemini-3-flash-preview:generateContent',
+    endpoint: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent',
     apiKey: googleApiKey,
   },
 };
@@ -65,9 +65,14 @@ async function callSiliconFlow(prompt: string) {
   }, API_TIMEOUT);
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-    throw new Error(errorData.error || `API error: ${response.status}`);
-  }
+      try {
+        const errorData = await response.json();
+        const errorMessage = errorData.error?.message || errorData.error || `API error: ${response.status}`;
+        throw new Error(errorMessage);
+      } catch (jsonError) {
+        throw new Error(`API error: ${response.status}`);
+      }
+    }
 
   const data = await response.json();
   const content = data.choices?.[0]?.message?.content;
@@ -106,9 +111,14 @@ async function callZhipu(prompt: string) {
   }, API_TIMEOUT);
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-    throw new Error(errorData.error || `API error: ${response.status}`);
-  }
+      try {
+        const errorData = await response.json();
+        const errorMessage = errorData.error?.message || errorData.error || `API error: ${response.status}`;
+        throw new Error(errorMessage);
+      } catch (jsonError) {
+        throw new Error(`API error: ${response.status}`);
+      }
+    }
 
   const data = await response.json();
   const content = data.choices?.[0]?.message?.content;
@@ -150,9 +160,14 @@ async function callGoogle(prompt: string) {
   }, API_TIMEOUT);
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-    throw new Error(errorData.error || `API error: ${response.status}`);
-  }
+      try {
+        const errorData = await response.json();
+        const errorMessage = errorData.error?.message || errorData.error || `API error: ${response.status}`;
+        throw new Error(errorMessage);
+      } catch (jsonError) {
+        throw new Error(`API error: ${response.status}`);
+      }
+    }
 
   const data = await response.json();
   const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
@@ -174,34 +189,51 @@ async function tryMultipleModels(prompt: string, preferredModel?: string) {
 
   let lastError: Error | null = null;
 
+  console.log('Starting model fallback sequence:', modelsToTry);
+
   for (const modelName of modelsToTry) {
     try {
+      console.log(`\nAttempting ${modelName}...`);
+      
       switch (modelName) {
         case 'siliconflow':
           if (siliconFlowApiKey) {
-            console.log('Trying SiliconFlow Qwen 3.5-4B...');
-            return await callSiliconFlow(prompt);
+            console.log('  SiliconFlow API key configured, calling...');
+            const result = await callSiliconFlow(prompt);
+            console.log('  ✓ SiliconFlow successful');
+            return result;
+          } else {
+            console.log('  ⚠ SiliconFlow API key not configured');
           }
           break;
         case 'zhipu':
           if (zhipuApiKey) {
-            console.log('Trying Zhipu GLM-4.7-Flash...');
-            return await callZhipu(prompt);
+            console.log('  Zhipu API key configured, calling...');
+            const result = await callZhipu(prompt);
+            console.log('  ✓ Zhipu successful');
+            return result;
+          } else {
+            console.log('  ⚠ Zhipu API key not configured');
           }
           break;
         case 'google':
           if (googleApiKey) {
-            console.log('Trying Google Gemini...');
-            return await callGoogle(prompt);
+            console.log('  Google API key configured, calling...');
+            const result = await callGoogle(prompt);
+            console.log('  ✓ Google successful');
+            return result;
+          } else {
+            console.log('  ⚠ Google API key not configured');
           }
           break;
       }
     } catch (error: any) {
-      console.error(`Error with ${modelName}:`, error.message);
+      console.error(`  ✗ Error with ${modelName}:`, error.message);
       lastError = error;
     }
   }
 
+  console.log('\nAll models failed:', lastError?.message);
   throw lastError || new Error('No available models configured');
 }
 
