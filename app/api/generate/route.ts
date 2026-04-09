@@ -80,7 +80,7 @@ async function callSiliconFlow(prompt: string) {
     throw new Error('Empty response from AI');
   }
 
-  return { content, model: 'SiliconFlow GLM-4.7' };
+  return { content, model: 'SiliconFlow Tencent Hunyuan MT-7B' };
 }
 
 // 调用智谱 AI API
@@ -292,7 +292,7 @@ export async function POST(request: NextRequest) {
         error: error.message || 'Failed to generate content',
         message: 'All models failed. Please check your network connection and API keys.',
         models: [
-          { value: 'siliconflow', label: 'SiliconFlow Qwen 3.5-4B' },
+          { value: 'siliconflow', label: 'SiliconFlow Tencent Hunyuan MT-7B' },
           { value: 'zhipu', label: '智谱 GLM-4.7-Flash' },
           { value: 'google', label: 'Google Gemini' }
         ]

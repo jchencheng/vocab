@@ -290,7 +290,7 @@ Include at least 2 meanings with different parts of speech if applicable.`;
                 onChange={(e) => setSelectedModel(e.target.value)}
                 className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 dark:text-white rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
               >
-                <option value="siliconflow">SiliconFlow Qwen 3.5-4B (默认)</option>
+                <option value="siliconflow">SiliconFlow Tencent Hunyuan MT-7B (默认)</option>
                 <option value="zhipu">智谱 GLM-4.7-Flash</option>
                 <option value="google">Google Gemini</option>
               </select>
