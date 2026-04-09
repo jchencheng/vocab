@@ -20,8 +20,8 @@ const MODELS = {
     apiKey: zhipuApiKey,
   },
   GOOGLE: {
-    name: 'gemini-3-flash-preview',
-    endpoint: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent',
+    name: 'gemini-3.1-flash-lite',
+    endpoint: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent',
     apiKey: googleApiKey,
   },
 };
