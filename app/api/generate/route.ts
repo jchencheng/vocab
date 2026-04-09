@@ -10,7 +10,7 @@ const API_TIMEOUT = 10000;
 // 模型配置
 const MODELS = {
   SILICONFLOW: {
-    name: 'Pro/zai-org/GLM-4.7',
+    name: 'Qwen/Qwen3.5-4B',
     endpoint: 'https://api.siliconflow.cn/v1/chat/completions',
     apiKey: siliconFlowApiKey,
   },
