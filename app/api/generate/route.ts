@@ -10,7 +10,7 @@ const API_TIMEOUT = 10000;
 // 模型配置
 const MODELS = {
   SILICONFLOW: {
-    name: 'Qwen/Qwen3.5-4B',
+    name: 'Pro/zai-org/GLM-4.7',
     endpoint: 'https://api.siliconflow.cn/v1/chat/completions',
     apiKey: siliconFlowApiKey,
   },
@@ -53,6 +53,10 @@ async function callSiliconFlow(prompt: string) {
       model: model.name,
       messages: [
         {
+          role: 'system',
+          content: '你是一个有用的助手'
+        },
+        {
           role: 'user',
           content: prompt,
         },
@@ -60,19 +64,18 @@ async function callSiliconFlow(prompt: string) {
       max_tokens: 8000,
       temperature: 0.7,
       top_p: 0.7,
-      enable_thinking: false,
     }),
   }, API_TIMEOUT);
 
   if (!response.ok) {
-      try {
-        const errorData = await response.json();
-        const errorMessage = errorData.error?.message || errorData.error || `API error: ${response.status}`;
-        throw new Error(errorMessage);
-      } catch (jsonError) {
-        throw new Error(`API error: ${response.status}`);
-      }
+    try {
+      const errorData = await response.json();
+      const errorMessage = errorData.error?.message || errorData.error || `API error: ${response.status}`;
+      throw new Error(errorMessage);
+    } catch (jsonError) {
+      throw new Error(`API error: ${response.status}`);
     }
+  }
 
   const data = await response.json();
   const content = data.choices?.[0]?.message?.content;
@@ -81,7 +84,7 @@ async function callSiliconFlow(prompt: string) {
     throw new Error('Empty response from AI');
   }
 
-  return { content, model: 'SiliconFlow Qwen 3.5-4B' };
+  return { content, model: 'SiliconFlow GLM-4.7' };
 }
 
 // 调用智谱 AI API
@@ -145,6 +148,7 @@ async function callGoogle(prompt: string) {
     body: JSON.stringify({
       contents: [
         {
+          role: 'user',
           parts: [
             {
               text: prompt,
@@ -160,14 +164,14 @@ async function callGoogle(prompt: string) {
   }, API_TIMEOUT);
 
   if (!response.ok) {
-      try {
-        const errorData = await response.json();
-        const errorMessage = errorData.error?.message || errorData.error || `API error: ${response.status}`;
-        throw new Error(errorMessage);
-      } catch (jsonError) {
-        throw new Error(`API error: ${response.status}`);
-      }
+    try {
+      const errorData = await response.json();
+      const errorMessage = errorData.error?.message || errorData.error || `API error: ${response.status}`;
+      throw new Error(errorMessage);
+    } catch (jsonError) {
+      throw new Error(`API error: ${response.status}`);
     }
+  }
 
   const data = await response.json();
   const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
