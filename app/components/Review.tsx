@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
-import { calculateNextReview, getDueWords, shuffleWords, limitWords, postponeToTomorrow } from '../utils/spacedRepetition';
+import { calculateNextReview, getDueWords, shuffleWords, limitWords, postponeToTomorrow, getTodayReviewQueue, postponeWithPriority } from '../utils/spacedRepetition';
 import { getIntervalText, getChineseDefinition, getExampleSentence, playAudio, hasAudio } from '../utils/wordUtils';
 import { QUALITY_LABELS } from '../constants';
 import type { Word } from '../types';
@@ -20,16 +20,30 @@ export function Review() {
 
   const maxDailyReviews = settings.maxDailyReviews || 50;
 
+  // 初始化复习队列，并自动推迟超出限制的单词
   useEffect(() => {
-    const dueWords = getDueWords(words);
-    const shuffled = shuffleWords(dueWords);
-    const limited = limitWords(shuffled, maxDailyReviews);
-    setQueue(limited);
-    setCurrentIndex(0);
-    setShowAnswer(false);
-    setIsComplete(false);
-    setPostponedCount(0);
-  }, [words, maxDailyReviews]);
+    const initReviewQueue = async () => {
+      // 获取今日复习队列和需要推迟的单词
+      const { todayQueue, postponedWords } = getTodayReviewQueue(words, maxDailyReviews);
+      
+      // 如果有需要推迟的单词，自动推迟它们
+      if (postponedWords.length > 0) {
+        const postponed = postponeWithPriority(postponedWords);
+        // 批量更新推迟的单词
+        for (const word of postponed) {
+          await updateWord(word);
+        }
+      }
+      
+      setQueue(todayQueue);
+      setCurrentIndex(0);
+      setShowAnswer(false);
+      setIsComplete(false);
+      setPostponedCount(postponedWords.length);
+    };
+    
+    initReviewQueue();
+  }, [words, maxDailyReviews, updateWord]);
 
   const currentWord = queue[currentIndex];
   const progress = queue.length > 0 ? ((currentIndex + 1) / queue.length) * 100 : 0;
@@ -67,16 +81,25 @@ export function Review() {
     }
   }, [currentWord, currentIndex, queue.length, updateWord]);
 
-  const handleRestart = useCallback(() => {
-    const dueWords = getDueWords(words);
-    const shuffled = shuffleWords(dueWords);
-    const limited = limitWords(shuffled, maxDailyReviews);
-    setQueue(limited);
+  const handleRestart = useCallback(async () => {
+    // 获取今日复习队列和需要推迟的单词
+    const { todayQueue, postponedWords } = getTodayReviewQueue(words, maxDailyReviews);
+    
+    // 如果有需要推迟的单词，自动推迟它们
+    if (postponedWords.length > 0) {
+      const postponed = postponeWithPriority(postponedWords);
+      // 批量更新推迟的单词
+      for (const word of postponed) {
+        await updateWord(word);
+      }
+    }
+    
+    setQueue(todayQueue);
     setCurrentIndex(0);
     setShowAnswer(false);
     setIsComplete(false);
-    setPostponedCount(0);
-  }, [words, maxDailyReviews]);
+    setPostponedCount(postponedWords.length);
+  }, [words, maxDailyReviews, updateWord]);
 
   if (queue.length === 0) {
     return (

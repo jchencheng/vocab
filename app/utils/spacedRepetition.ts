@@ -17,10 +17,10 @@ export function createNewWord(
     tags,
     createdAt: now,
     updatedAt: now,
-    nextReviewAt: now,
+    nextReviewAt: now, // 新单词立即可复习
     reviewCount: 0,
     easeFactor: DEFAULT_EASE_FACTOR,
-    interval: 0,
+    interval: 0, // 初始间隔为0，第一次复习后变为 FIRST_INTERVAL (1天)
     quality: 0,
   };
 }
@@ -54,6 +54,7 @@ export function calculateNextReview(word: Word, quality: number): Word {
     easeFactor,
     interval,
     reviewCount,
+    quality, // 保存评分质量
     nextReviewAt,
     updatedAt: Date.now(),
   };
