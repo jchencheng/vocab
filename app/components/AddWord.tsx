@@ -131,7 +131,7 @@ export function AddWord() {
 
   // 翻译中文释义
   const handleTranslateChinese = useCallback(async () => {
-    if (meanings.every(m => m.definitions.every(d => d.chineseDefinition))) {
+    if (meanings.every(m => m.definitions.every((d: { chineseDefinition?: string }) => d.chineseDefinition))) {
       setError('所有释义已有中文翻译');
       return;
     }
