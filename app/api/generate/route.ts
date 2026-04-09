@@ -10,7 +10,7 @@ const API_TIMEOUT = 30000;
 // 模型配置
 const MODELS = {
   SILICONFLOW: {
-    name: 'Qwen/Qwen3.5-4B',
+    name: 'tencent/Hunyuan-MT-7B',
     endpoint: 'https://api.siliconflow.cn/v1/chat/completions',
     apiKey: siliconFlowApiKey,
   },
@@ -192,11 +192,14 @@ async function tryMultipleModels(prompt: string, preferredModel?: string) {
 
   let lastError: Error | null = null;
 
+  console.log('\n==================================');
   console.log('Starting model fallback sequence:', modelsToTry);
+  console.log('Prompt:', prompt.substring(0, 100) + (prompt.length > 100 ? '...' : ''));
+  console.log('==================================');
 
   for (const modelName of modelsToTry) {
     try {
-      console.log(`\nAttempting ${modelName}...`);
+      console.log(`\n[${new Date().toLocaleTimeString()}] Attempting ${modelName}...`);
       
       switch (modelName) {
         case 'siliconflow':
@@ -204,6 +207,7 @@ async function tryMultipleModels(prompt: string, preferredModel?: string) {
             console.log('  SiliconFlow API key configured, calling...');
             const result = await callSiliconFlow(prompt);
             console.log('  ✓ SiliconFlow successful');
+            console.log('  Response:', result.content.substring(0, 200) + (result.content.length > 200 ? '...' : ''));
             return result;
           } else {
             console.log('  ⚠ SiliconFlow API key not configured');
@@ -214,6 +218,7 @@ async function tryMultipleModels(prompt: string, preferredModel?: string) {
             console.log('  Zhipu API key configured, calling...');
             const result = await callZhipu(prompt);
             console.log('  ✓ Zhipu successful');
+            console.log('  Response:', result.content.substring(0, 200) + (result.content.length > 200 ? '...' : ''));
             return result;
           } else {
             console.log('  ⚠ Zhipu API key not configured');
@@ -224,6 +229,7 @@ async function tryMultipleModels(prompt: string, preferredModel?: string) {
             console.log('  Google API key configured, calling...');
             const result = await callGoogle(prompt);
             console.log('  ✓ Google successful');
+            console.log('  Response:', result.content.substring(0, 200) + (result.content.length > 200 ? '...' : ''));
             return result;
           } else {
             console.log('  ⚠ Google API key not configured');
@@ -236,20 +242,40 @@ async function tryMultipleModels(prompt: string, preferredModel?: string) {
     }
   }
 
-  console.log('\nAll models failed:', lastError?.message);
+  console.log('\n==================================');
+  console.log('All models failed:', lastError?.message);
+  console.log('==================================');
   throw lastError || new Error('No available models configured');
 }
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('\n==================================');
+    console.log('[API Request] Received POST /api/generate');
+    console.log('==================================');
+    
     const { prompt, wordList, model } = await request.json();
+    
+    console.log('Request details:');
+    console.log('  Model:', model || 'default');
+    console.log('  Word list length:', wordList?.length || 0);
+    console.log('  Prompt:', prompt?.substring(0, 100) + (prompt?.length > 100 ? '...' : ''));
 
     if (!prompt) {
+      console.log('  ⚠ Missing prompt');
       return NextResponse.json({ error: 'prompt is required' }, { status: 400 });
     }
 
+    console.log('  ✓ Processing request...');
     // 尝试使用多个模型，实现故障转移
     const result = await tryMultipleModels(prompt, model);
+    
+    console.log('\n==================================');
+    console.log('[API Response] Success');
+    console.log('==================================');
+    console.log('  Model used:', result.model);
+    console.log('  Response length:', result.content.length);
+    console.log('  Response preview:', result.content.substring(0, 200) + (result.content.length > 200 ? '...' : ''));
 
     return NextResponse.json({ 
       content: result.content,
@@ -257,10 +283,12 @@ export async function POST(request: NextRequest) {
       message: `Using ${result.model} for generation`
     });
   } catch (error: any) {
-    console.error('Generate API error:', error);
+    console.error('\n==================================');
+    console.error('[API Error] Generate API error:', error);
+    console.error('==================================');
     
     return NextResponse.json(
-      { 
+      {
         error: error.message || 'Failed to generate content',
         message: 'All models failed. Please check your network connection and API keys.',
         models: [
