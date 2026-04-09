@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
 import { useWordEditor } from '../hooks/useWordEditor';
 import { getIntervalText, playAudio, hasAudio, parseTags } from '../utils/formatters';
+import { generateContent } from '../services/apiClient';
 import type { Word } from '../types';
 
 interface WordDetailModalProps {
@@ -16,12 +17,81 @@ export function WordDetailModal({ word, onClose, onDelete }: WordDetailModalProp
   const { updateWord } = useApp();
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isLoadingDefinition, setIsLoadingDefinition] = useState(false);
+  const [error, setError] = useState('');
+  const [selectedModel, setSelectedModel] = useState<string>('siliconflow');
+  const [modelMessage, setModelMessage] = useState('');
 
   const editor = useWordEditor({ initialWord: word });
 
   const handlePlayAudio = useCallback(() => {
     playAudio(word.phonetics);
   }, [word.phonetics]);
+
+  const handleGetDefinitions = useCallback(async () => {
+    if (!editor.editWord.trim()) return;
+
+    setIsLoadingDefinition(true);
+    setError('');
+    setModelMessage('');
+
+    try {
+      const prompt = `Provide a detailed dictionary definition for the word "${editor.editWord}" in JSON format with the following structure:
+{
+  "word": "${editor.editWord}",
+  "phonetic": "/phonetic/",
+  "meanings": [
+    {
+      "partOfSpeech": "noun|verb|adjective|adverb|etc",
+      "definitions": [
+        {
+          "definition": "clear English definition",
+          "example": "example sentence",
+          "chineseDefinition": "中文释义"
+        }
+      ]
+    }
+  ]
+}
+Include at least 2 meanings with different parts of speech if applicable.`;
+
+      const response = await generateContent(prompt, undefined, selectedModel);
+      const content = response.content;
+      
+      // 显示使用的模型
+      if (response.model) {
+        setModelMessage(`使用 ${response.model} 生成释义`);
+      }
+
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const wordData = JSON.parse(jsonMatch[0]);
+
+        editor.setEditPhonetic(wordData.phonetic || '');
+        editor.setEditMeanings(
+          wordData.meanings.map((m: any) => ({
+            partOfSpeech: m.partOfSpeech,
+            definitions: m.definitions.map((d: any) => ({
+              definition: d.definition,
+              example: d.example || '',
+              chineseDefinition: d.chineseDefinition,
+              synonyms: [],
+              antonyms: [],
+            })),
+            synonyms: [],
+            antonyms: [],
+          }))
+        );
+      } else {
+        setError('Failed to parse word definition');
+      }
+    } catch (err: any) {
+      console.error('Error fetching definition:', err);
+      setError('Failed to fetch definition: ' + err.message);
+    } finally {
+      setIsLoadingDefinition(false);
+    }
+  }, [editor, selectedModel]);
 
   const handleSave = useCallback(async () => {
     const tags = parseTags(editor.editTags);
@@ -79,6 +149,47 @@ export function WordDetailModal({ word, onClose, onDelete }: WordDetailModalProp
                       className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 dark:text-white rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
                     />
                   </div>
+                  <div className="mt-3">
+                    <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">优先模型</label>
+                    <select
+                      value={selectedModel}
+                      onChange={(e) => setSelectedModel(e.target.value)}
+                      className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 dark:text-white rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                    >
+                      <option value="siliconflow">SiliconFlow Qwen 3.5-4B (默认)</option>
+                      <option value="zhipu">智谱 GLM-4.7-Flash</option>
+                      <option value="google">Google Gemini</option>
+                    </select>
+                  </div>
+                  {error && (
+                    <div className="mt-3 p-3 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800/50 rounded-2xl text-rose-600 dark:text-rose-400 text-sm flex items-center gap-2">
+                      <span>⚠️</span>
+                      {error}
+                    </div>
+                  )}
+                  {modelMessage && (
+                    <div className="mt-3 p-3 bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800/50 rounded-2xl text-primary-600 dark:text-primary-400 text-sm flex items-center gap-2">
+                      <span>✅</span>
+                      {modelMessage}
+                    </div>
+                  )}
+                  <button
+                    onClick={handleGetDefinitions}
+                    disabled={!editor.editWord.trim() || isLoadingDefinition}
+                    className="w-full px-4 py-3 bg-gradient-to-r from-primary-600 to-accent-600 text-white rounded-2xl font-semibold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-soft flex items-center justify-center gap-2"
+                  >
+                    {isLoadingDefinition ? (
+                      <>
+                        <span className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full" />
+                        Getting definitions...
+                      </>
+                    ) : (
+                      <>
+                        <span>🔍</span>
+                        Get Definitions
+                      </>
+                    )}
+                  </button>
                 </div>
               ) : (
                 <div>
@@ -107,8 +218,8 @@ export function WordDetailModal({ word, onClose, onDelete }: WordDetailModalProp
                 </button>
               )}
               <button onClick={onClose} className="p-3 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/50 rounded-2xl transition-colors">
-                ✕
-              </button>
+                  ✕
+                </button>
             </div>
           </div>
 
@@ -141,12 +252,39 @@ export function WordDetailModal({ word, onClose, onDelete }: WordDetailModalProp
                     />
                     {meaning.definitions.map((def, defIdx) => (
                       <div key={defIdx} className="mb-4">
-                        <textarea
-                          value={def.definition}
-                          onChange={(e) => editor.updateDefinition(idx, defIdx, 'definition', e.target.value)}
-                          className="w-full px-3 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 dark:text-white rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all resize-none"
-                          rows={2}
-                        />
+                        <div className="mb-3">
+                          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
+                            English Definition
+                          </label>
+                          <textarea
+                            value={def.definition}
+                            onChange={(e) => editor.updateDefinition(idx, defIdx, 'definition', e.target.value)}
+                            className="w-full px-3 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 dark:text-white rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all resize-none"
+                            rows={2}
+                          />
+                        </div>
+                        <div className="mb-3">
+                          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
+                            Chinese Definition
+                          </label>
+                          <input
+                            type="text"
+                            value={def.chineseDefinition || ''}
+                            onChange={(e) => editor.updateDefinition(idx, defIdx, 'chineseDefinition', e.target.value)}
+                            className="w-full px-3 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 dark:text-white rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                          />
+                        </div>
+                        <div className="mb-3">
+                          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
+                            Example
+                          </label>
+                          <input
+                            type="text"
+                            value={def.example || ''}
+                            onChange={(e) => editor.updateDefinition(idx, defIdx, 'example', e.target.value)}
+                            className="w-full px-3 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 dark:text-white rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                          />
+                        </div>
                       </div>
                     ))}
                   </div>

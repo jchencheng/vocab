@@ -184,12 +184,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       try {
         setIsLoading(true);
-        await Promise.all([refreshWords(), refreshContexts()]);
+        // 优先加载设置，因为设置影响 UI 渲染
         const savedSettings = await fetchSettings(user.id);
         if (savedSettings) {
           setSettings(savedSettings);
           setIsDarkMode(savedSettings.darkMode || false);
         }
+        // 并行加载单词和上下文数据
+        await Promise.all([refreshWords(), refreshContexts()]);
         lastUserIdRef.current = user.id;
       } catch (error) {
         console.error('Error loading data:', error);

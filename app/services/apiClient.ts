@@ -87,10 +87,10 @@ export async function saveSettingsAPI(settings: AppSettings, userId: string): Pr
 
 // ========== Generate API ==========
 
-export async function generateContent(prompt: string, wordList?: string[]): Promise<string> {
+export async function generateContent(prompt: string, wordList?: string[], model?: string): Promise<{ content: string; model?: string }> {
   const response = await fetchAPI(`${API_BASE_URL}/generate`, {
     method: 'POST',
-    body: JSON.stringify({ prompt, wordList }),
+    body: JSON.stringify({ prompt, wordList, model }),
   });
-  return response.content;
+  return response;
 }

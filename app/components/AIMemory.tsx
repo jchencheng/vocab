@@ -2,9 +2,12 @@
 
 import { useState, useCallback, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
+import { Pagination } from './Pagination';
 import { generateContent } from '../services/apiClient';
 import { formatWithBionicReading, formatShortDate } from '../utils/formatters';
 import type { Word, AIContext } from '../types';
+
+const ITEMS_PER_PAGE = 5;
 
 export function AIMemory() {
   const { words, contexts, addContext, updateContext, deleteContext, isLoading } = useApp();
@@ -15,6 +18,7 @@ export function AIMemory() {
   const [editContent, setEditContent] = useState('');
   const [activeTab, setActiveTab] = useState<'generate' | 'history'>('generate');
   const [showBionic, setShowBionic] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const toggleWordSelection = useCallback((wordId: string) => {
     setSelectedWords(prev => {
@@ -31,6 +35,21 @@ export function AIMemory() {
   const selectedWordsList = useMemo(() => {
     return words.filter(w => selectedWords.has(w.id));
   }, [words, selectedWords]);
+
+  // 分页逻辑
+  const totalPages = Math.ceil(contexts.length / ITEMS_PER_PAGE);
+  const paginatedContexts = useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    return contexts.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [contexts, currentPage]);
+
+  // 当切换到历史标签时，重置到第一页
+  const handleTabChange = (tab: 'generate' | 'history') => {
+    setActiveTab(tab);
+    if (tab === 'history') {
+      setCurrentPage(1);
+    }
+  };
 
   const handleGenerate = useCallback(async () => {
     if (selectedWords.size === 0) return;
@@ -52,8 +71,9 @@ Format your response as a JSON object with this structure:
   "story": "Your story here with **highlighted words** (definitions)"
 }`;
 
-      const content = await generateContent(prompt, wordList);
-      
+      const response = await generateContent(prompt, wordList);
+      const content = response.content;
+
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
@@ -83,6 +103,7 @@ Format your response as a JSON object with this structure:
     setGeneratedContent('');
     setSelectedWords(new Set());
     setActiveTab('history');
+    setCurrentPage(1);
   }, [generatedContent, selectedWords, addContext]);
 
   const handleEditContext = useCallback((context: AIContext) => {
@@ -106,8 +127,12 @@ Format your response as a JSON object with this structure:
   const handleDeleteContext = useCallback(async (id: string) => {
     if (confirm('Are you sure you want to delete this story?')) {
       await deleteContext(id);
+      // 如果删除后当前页没有数据了，回到上一页
+      if (paginatedContexts.length === 1 && currentPage > 1) {
+        setCurrentPage(currentPage - 1);
+      }
     }
-  }, [deleteContext]);
+  }, [deleteContext, paginatedContexts.length, currentPage]);
 
   const renderContent = (content: string) => {
     if (!showBionic) {
@@ -170,7 +195,7 @@ Format your response as a JSON object with this structure:
       <div className="bg-white dark:bg-slate-800/80 backdrop-blur-xl rounded-3xl shadow-medium border border-slate-200/50 dark:border-slate-700/50 overflow-hidden">
         <div className="flex border-b border-slate-200 dark:border-slate-700">
           <button
-            onClick={() => setActiveTab('generate')}
+            onClick={() => handleTabChange('generate')}
             className={`flex-1 py-4 text-center font-semibold transition-all relative ${
               activeTab === 'generate'
                 ? 'text-primary-600 dark:text-primary-400'
@@ -186,7 +211,7 @@ Format your response as a JSON object with this structure:
             </span>
           </button>
           <button
-            onClick={() => setActiveTab('history')}
+            onClick={() => handleTabChange('history')}
             className={`flex-1 py-4 text-center font-semibold transition-all relative ${
               activeTab === 'history'
                 ? 'text-primary-600 dark:text-primary-400'
@@ -303,69 +328,79 @@ Format your response as a JSON object with this structure:
                   <p className="text-slate-600 dark:text-slate-400">Create your first story to get started!</p>
                 </div>
               ) : (
-                contexts.map((context, idx) => (
-                  <div key={context.id} className="bg-slate-50 dark:bg-slate-700/50 rounded-2xl p-6 border border-slate-200 dark:border-slate-600/50 animate-slide-up" style={{ animationDelay: `${idx * 0.05}s` }}>
-                    {editingContext?.id === context.id ? (
-                      <div className="space-y-4">
-                        <textarea
-                          value={editContent}
-                          onChange={(e) => setEditContent(e.target.value)}
-                          className="w-full px-4 py-3 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all resize-none"
-                          rows={6}
-                        />
-                        <div className="flex gap-3">
-                          <button
-                            onClick={() => setEditingContext(null)}
-                            className="flex-1 px-5 py-2.5 border-2 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-xl font-medium hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-all"
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            onClick={handleUpdateContext}
-                            className="flex-1 px-5 py-2.5 bg-gradient-to-r from-primary-600 to-accent-600 text-white rounded-xl font-semibold hover:opacity-90 transition-all shadow-soft active:scale-[0.98]"
-                          >
-                            Save
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-200 dark:border-slate-600">
-                          <div className="flex items-center gap-3 text-sm text-slate-500 dark:text-slate-400">
-                            <span className="flex items-center gap-1">
-                              <span>📅</span>
-                              {formatShortDate(context.createdAt)}
-                            </span>
-                            <span className="text-slate-300 dark:text-slate-600">•</span>
-                            <span className="flex items-center gap-1">
-                              <span>📝</span>
-                              {context.wordIds.length} words
-                            </span>
-                          </div>
-                          <div className="flex gap-2">
+                <>
+                  {paginatedContexts.map((context) => (
+                    <div key={context.id} className="bg-slate-50 dark:bg-slate-700/50 rounded-2xl p-6 border border-slate-200 dark:border-slate-600/50">
+                      {editingContext?.id === context.id ? (
+                        <div className="space-y-4">
+                          <textarea
+                            value={editContent}
+                            onChange={(e) => setEditContent(e.target.value)}
+                            className="w-full px-4 py-3 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all resize-none"
+                            rows={6}
+                          />
+                          <div className="flex gap-3">
                             <button
-                              onClick={() => handleEditContext(context)}
-                              className="p-2 text-primary-600 dark:text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-900/20 rounded-xl transition-colors"
-                              title="Edit"
+                              onClick={() => setEditingContext(null)}
+                              className="flex-1 px-5 py-2.5 border-2 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-xl font-medium hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-all"
                             >
-                              ✏️
+                              Cancel
                             </button>
                             <button
-                              onClick={() => handleDeleteContext(context.id)}
-                              className="p-2 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/20 rounded-xl transition-colors"
-                              title="Delete"
+                              onClick={handleUpdateContext}
+                              className="flex-1 px-5 py-2.5 bg-gradient-to-r from-primary-600 to-accent-600 text-white rounded-xl font-semibold hover:opacity-90 transition-all shadow-soft active:scale-[0.98]"
                             >
-                              🗑️
+                              Save
                             </button>
                           </div>
                         </div>
-                        <div className="text-slate-700 dark:text-slate-300 leading-relaxed text-base">
-                          {renderContent(context.content)}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                ))
+                      ) : (
+                        <>
+                          <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-200 dark:border-slate-600">
+                            <div className="flex items-center gap-3 text-sm text-slate-500 dark:text-slate-400">
+                              <span className="flex items-center gap-1">
+                                <span>📅</span>
+                                {formatShortDate(context.createdAt)}
+                              </span>
+                              <span className="text-slate-300 dark:text-slate-600">•</span>
+                              <span className="flex items-center gap-1">
+                                <span>📝</span>
+                                {context.wordIds.length} words
+                              </span>
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleEditContext(context)}
+                                className="p-2 text-primary-600 dark:text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-900/20 rounded-xl transition-colors"
+                                title="Edit"
+                              >
+                                ✏️
+                              </button>
+                              <button
+                                onClick={() => handleDeleteContext(context.id)}
+                                className="p-2 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/20 rounded-xl transition-colors"
+                                title="Delete"
+                              >
+                                🗑️
+                              </button>
+                            </div>
+                          </div>
+                          <div className="text-slate-700 dark:text-slate-300 leading-relaxed text-base">
+                            {renderContent(context.content)}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ))}
+
+                  <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={setCurrentPage}
+                    totalItems={contexts.length}
+                    itemsPerPage={ITEMS_PER_PAGE}
+                  />
+                </>
               )}
             </div>
           )}

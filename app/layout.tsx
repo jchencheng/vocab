@@ -15,7 +15,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100">
+      <body suppressHydrationWarning className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100">
         <div className="fixed inset-0 -z-10 overflow-hidden">
           <div className="absolute -top-40 -left-40 h-80 w-80 rounded-full bg-primary-100 dark:bg-primary-900/20 blur-3xl opacity-60 animate-float" />
           <div className="absolute top-1/3 -right-40 h-96 w-96 rounded-full bg-accent-100 dark:bg-accent-900/20 blur-3xl opacity-50 animate-float" style={{ animationDelay: '-2s' }} />
