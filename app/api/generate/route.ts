@@ -4,8 +4,8 @@ const siliconFlowApiKey = process.env.SILICONFLOW_API_KEY;
 const zhipuApiKey = process.env.ZHIPU_API_KEY;
 const googleApiKey = process.env.GOOGLE_API_KEY;
 
-// 设置超时时间（10秒）
-const API_TIMEOUT = 10000;
+// 设置超时时间（30秒）
+const API_TIMEOUT = 30000;
 
 // 模型配置
 const MODELS = {
@@ -52,10 +52,6 @@ async function callSiliconFlow(prompt: string) {
     body: JSON.stringify({
       model: model.name,
       messages: [
-        {
-          role: 'system',
-          content: '你是一个有用的助手'
-        },
         {
           role: 'user',
           content: prompt,
