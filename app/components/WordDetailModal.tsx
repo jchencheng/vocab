@@ -71,13 +71,13 @@ export function WordDetailModal({ word, onClose, onDelete }: WordDetailModalProp
       const definitionsToTranslate: { meaningIndex: number; defIndex: number; definition: string; example: string }[] = [];
       
       meanings.forEach((meaning, mIndex) => {
-        meaning.definitions.forEach((def, dIndex) => {
+        meaning.definitions.forEach((def: { chineseDefinition?: string; definition: string; example?: string }, dIndex: number) => {
           if (!def.chineseDefinition && def.definition) {
             definitionsToTranslate.push({
               meaningIndex: mIndex,
               defIndex: dIndex,
               definition: def.definition,
-              example: def.example,
+              example: def.example || '',
             });
           }
         });

@@ -89,7 +89,7 @@ export function AddWord() {
             return {
               ...meaning,
               definitions: meaning.definitions.filter(
-                (_: any, i: number) => i !== definitionIndex
+                (_d: { definition: string; example?: string; chineseDefinition?: string }, i: number) => i !== definitionIndex
               ),
             };
           }
@@ -145,13 +145,13 @@ export function AddWord() {
       const definitionsToTranslate: { meaningIndex: number; defIndex: number; definition: string; example: string }[] = [];
       
       meanings.forEach((meaning, mIndex) => {
-        meaning.definitions.forEach((def, dIndex) => {
+        meaning.definitions.forEach((def: { chineseDefinition?: string; definition: string; example?: string }, dIndex: number) => {
           if (!def.chineseDefinition && def.definition) {
             definitionsToTranslate.push({
               meaningIndex: mIndex,
               defIndex: dIndex,
               definition: def.definition,
-              example: def.example,
+              example: def.example || '',
             });
           }
         });
@@ -377,7 +377,7 @@ export function AddWord() {
                 </div>
 
                 <div className="space-y-4">
-                  {meaning.definitions.map((def, defIndex) => (
+                  {meaning.definitions.map((def: { definition: string; example?: string; chineseDefinition?: string }, defIndex: number) => (
                     <div
                       key={defIndex}
                       className="bg-gray-50 rounded-lg p-4 space-y-3"
@@ -395,7 +395,7 @@ export function AddWord() {
                                   ? {
                                       ...m,
                                       definitions: m.definitions.map(
-                                        (d, di) =>
+                                        (d: { definition: string; example?: string; chineseDefinition?: string }, di: number) =>
                                           di === defIndex
                                             ? { ...d, definition: e.target.value }
                                             : d
@@ -424,7 +424,7 @@ export function AddWord() {
                                   ? {
                                       ...m,
                                       definitions: m.definitions.map(
-                                        (d, di) =>
+                                        (d: { definition: string; example?: string; chineseDefinition?: string }, di: number) =>
                                           di === defIndex
                                             ? { ...d, example: e.target.value }
                                             : d
@@ -453,7 +453,7 @@ export function AddWord() {
                                   ? {
                                       ...m,
                                       definitions: m.definitions.map(
-                                        (d, di) =>
+                                        (d: { definition: string; example?: string; chineseDefinition?: string }, di: number) =>
                                           di === defIndex
                                             ? { ...d, chineseDefinition: e.target.value }
                                             : d
