@@ -17,11 +17,15 @@ export function Review() {
   const [mode, setMode] = useState<ReviewMode>('en-to-cn');
   const [isComplete, setIsComplete] = useState(false);
   const [postponedCount, setPostponedCount] = useState(0);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   const maxDailyReviews = settings.maxDailyReviews || 50;
 
   // 初始化复习队列，并自动推迟超出限制的单词
+  // 只在组件挂载时执行一次，避免 updateWord 后重置进度
   useEffect(() => {
+    if (isInitialized) return;
+    
     const initReviewQueue = async () => {
       // 获取今日复习队列和需要推迟的单词
       const { todayQueue, postponedWords } = getTodayReviewQueue(words, maxDailyReviews);
@@ -40,13 +44,15 @@ export function Review() {
       setShowAnswer(false);
       setIsComplete(false);
       setPostponedCount(postponedWords.length);
+      setIsInitialized(true);
     };
     
     initReviewQueue();
-  }, [words, maxDailyReviews, updateWord]);
+  }, [words, maxDailyReviews, updateWord, isInitialized]);
 
   const currentWord = queue[currentIndex];
-  const progress = queue.length > 0 ? ((currentIndex + 1) / queue.length) * 100 : 0;
+  // 进度从0%开始，完成所有单词后达到100%
+  const progress = queue.length > 0 ? (currentIndex / queue.length) * 100 : 0;
 
   const handleShowAnswer = useCallback(() => {
     setShowAnswer(true);
