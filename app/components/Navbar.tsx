@@ -1,6 +1,7 @@
 'use client';
 
 import { useAuth } from '../context/AuthContext';
+import { useApp } from '../context/AppContext';
 import { useState } from 'react';
 
 type View = 'list' | 'add' | 'review' | 'settings' | 'ai-memory';
@@ -12,6 +13,7 @@ interface NavbarProps {
 
 export function Navbar({ currentView, onViewChange }: NavbarProps) {
   const { user, signOut } = useAuth();
+  const { isDarkMode, toggleDarkMode } = useApp();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navItems: { id: View; label: string; icon: string }[] = [
@@ -63,6 +65,15 @@ export function Navbar({ currentView, onViewChange }: NavbarProps) {
 
           <div className="flex items-center gap-3">
             <div className="hidden md:flex items-center gap-3">
+              {/* 夜间模式开关 */}
+              <button
+                onClick={() => toggleDarkMode()}
+                className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+              >
+                <span className="text-xl">{isDarkMode ? '☀️' : '🌙'}</span>
+              </button>
+              
               <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-full">
                 <div className="h-7 w-7 rounded-full bg-gradient-to-br from-primary-400 to-accent-400 flex items-center justify-center text-white text-xs font-semibold">
                   {user?.email?.[0]?.toUpperCase() || 'U'}
@@ -109,6 +120,15 @@ export function Navbar({ currentView, onViewChange }: NavbarProps) {
                 </button>
               ))}
             </div>
+            {/* 移动端夜间模式开关 */}
+            <button
+              onClick={() => toggleDarkMode()}
+              className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 mb-2"
+            >
+              <span className="text-lg">{isDarkMode ? '☀️' : '🌙'}</span>
+              {isDarkMode ? 'Light Mode' : 'Dark Mode'}
+            </button>
+            
             <div className="flex items-center justify-between px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl">
               <div className="flex items-center gap-3">
                 <div className="h-8 w-8 rounded-full bg-gradient-to-br from-primary-400 to-accent-400 flex items-center justify-center text-white text-xs font-semibold">
