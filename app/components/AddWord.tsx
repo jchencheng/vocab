@@ -31,6 +31,7 @@ export function AddWord() {
   const [isTranslating, setIsTranslating] = useState(false);
   const [error, setError] = useState('');
   const [modelMessage, setModelMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
   const handleAddMeaning = useCallback(() => {
     setMeanings([
@@ -219,6 +220,14 @@ export function AddWord() {
 
       await addWord(newWord);
 
+      // 显示成功提示
+      setSuccessMessage(`"${newWord.word}" added successfully!`);
+      
+      // 3秒后清除成功提示
+      setTimeout(() => {
+        setSuccessMessage('');
+      }, 3000);
+
       // Reset form
       setWord('');
       setPhonetic('');
@@ -243,6 +252,7 @@ export function AddWord() {
       setModelMessage('');
     } catch (err) {
       setError('Failed to add word');
+      setSuccessMessage('');
     }
   }, [word, phonetic, tags, meanings, addWord]);
 
@@ -252,6 +262,12 @@ export function AddWord() {
         {error && (
           <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-600">
             {error}
+          </div>
+        )}
+
+        {successMessage && (
+          <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-green-600 animate-fade-in">
+            ✅ {successMessage}
           </div>
         )}
 

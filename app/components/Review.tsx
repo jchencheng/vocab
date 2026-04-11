@@ -62,29 +62,35 @@ export function Review() {
     if (!currentWord) return;
 
     const updatedWord = calculateNextReview(currentWord, quality);
-    await updateWord(updatedWord);
-
+    
+    // 立即切换到下一个单词，不等待 API 响应
     if (currentIndex < queue.length - 1) {
       setCurrentIndex(prev => prev + 1);
       setShowAnswer(false);
     } else {
       setIsComplete(true);
     }
+    
+    // 异步保存更新，不阻塞 UI
+    updateWord(updatedWord).catch(console.error);
   }, [currentWord, currentIndex, queue.length, updateWord]);
 
   const handlePostpone = useCallback(async () => {
     if (!currentWord) return;
 
     const updatedWord = postponeToTomorrow(currentWord);
-    await updateWord(updatedWord);
     setPostponedCount(prev => prev + 1);
 
+    // 立即切换到下一个单词，不等待 API 响应
     if (currentIndex < queue.length - 1) {
       setCurrentIndex(prev => prev + 1);
       setShowAnswer(false);
     } else {
       setIsComplete(true);
     }
+    
+    // 异步保存更新，不阻塞 UI
+    updateWord(updatedWord).catch(console.error);
   }, [currentWord, currentIndex, queue.length, updateWord]);
 
   const handleRestart = useCallback(async () => {
