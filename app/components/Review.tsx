@@ -88,6 +88,9 @@ export function Review() {
   }, [currentWord, currentIndex, queue.length, updateWord]);
 
   const handleRestart = useCallback(async () => {
+    // 重置初始化状态，强制重新加载队列
+    setIsInitialized(false);
+    
     // 获取今日复习队列和需要推迟的单词
     const { todayQueue, postponedWords } = getTodayReviewQueue(words, maxDailyReviews);
     
@@ -105,6 +108,7 @@ export function Review() {
     setShowAnswer(false);
     setIsComplete(false);
     setPostponedCount(postponedWords.length);
+    setIsInitialized(true);
   }, [words, maxDailyReviews, updateWord]);
 
   if (queue.length === 0) {
