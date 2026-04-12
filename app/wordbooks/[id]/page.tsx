@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '../../context/AuthContext';
 import { fetchWordBookDetail, fetchWordBookWords } from '../../services/wordbookAPI';
@@ -20,40 +20,54 @@ export default function WordBookDetailPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [hasLoaded, setHasLoaded] = useState(false);
 
-  const loadBookDetail = useCallback(async () => {
-    if (!user || !bookId) return;
-    try {
-      setIsLoading(true);
-      const data = await fetchWordBookDetail(bookId, user.id);
-      setBook(data);
-    } catch (err) {
-      console.error('Error loading book detail:', err);
-      setError('加载单词书详情失败');
-    }
-  }, [user, bookId]);
-
-  const loadWords = useCallback(async () => {
-    if (!user || !bookId) return;
-    try {
-      const data = await fetchWordBookWords(bookId, user.id, currentPage, WORDS_PER_PAGE);
-      setWords(data.words);
-      setTotalPages(Math.ceil(data.total / WORDS_PER_PAGE));
-    } catch (err) {
-      console.error('Error loading words:', err);
-      setError('加载单词列表失败');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [user, bookId, currentPage]);
-
+  // 加载单词书详情和单词列表
   useEffect(() => {
-    loadBookDetail();
-  }, [loadBookDetail]);
+    // 防止重复加载
+    if (hasLoaded || !user?.id || !bookId) return;
 
+    const loadData = async () => {
+      try {
+        setIsLoading(true);
+        
+        // 并行加载详情和单词
+        const [bookData, wordsData] = await Promise.all([
+          fetchWordBookDetail(bookId, user.id),
+          fetchWordBookWords(bookId, user.id, currentPage, WORDS_PER_PAGE)
+        ]);
+        
+        setBook(bookData);
+        setWords(wordsData.words);
+        setTotalPages(Math.ceil(wordsData.total / WORDS_PER_PAGE));
+        setHasLoaded(true);
+      } catch (err) {
+        console.error('Error loading data:', err);
+        setError('加载数据失败');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadData();
+  }, [user?.id, bookId, currentPage, hasLoaded]);
+
+  // 当页码改变时，只重新加载单词列表
   useEffect(() => {
-    loadWords();
-  }, [loadWords]);
+    if (!hasLoaded || !user?.id || !bookId) return;
+
+    const loadWordsOnly = async () => {
+      try {
+        const data = await fetchWordBookWords(bookId, user.id, currentPage, WORDS_PER_PAGE);
+        setWords(data.words);
+        setTotalPages(Math.ceil(data.total / WORDS_PER_PAGE));
+      } catch (err) {
+        console.error('Error loading words:', err);
+      }
+    };
+
+    loadWordsOnly();
+  }, [currentPage, hasLoaded, user?.id, bookId]);
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
