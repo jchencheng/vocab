@@ -56,12 +56,13 @@ export async function POST(request: NextRequest) {
 
     if (!existingUser) {
       // 用户不存在，创建新用户
+      // 使用 Date.now() 获取时间戳（bigint 格式）
       const { error: createUserError } = await supabase
         .from('users')
         .insert({
           id: userId,
           email: `user-${userId}@placeholder.com`,
-          created_at: new Date().toISOString()
+          created_at: Date.now()
         });
 
       if (createUserError) {
