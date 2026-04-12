@@ -65,6 +65,47 @@ export function getDueWords(words: Word[]): Word[] {
   return words.filter(w => w.nextReviewAt <= now);
 }
 
+/**
+ * 根据学习模式获取待复习单词
+ * @param words 所有单词
+ * @param studyMode 学习模式
+ * @param primaryWordBookId 主学单词书ID
+ * @param wordBookItems 单词书条目（用于判断单词属于哪些书）
+ */
+export function getDueWordsByStudyMode(
+  words: Word[],
+  studyMode: 'book-only' | 'book-priority' | 'mixed',
+  primaryWordBookId?: string | null,
+  wordBookItems?: { word_id: string; word_book_id: string }[]
+): Word[] {
+  const dueWords = getDueWords(words);
+
+  if (studyMode === 'mixed' || !primaryWordBookId) {
+    return dueWords;
+  }
+
+  // 获取主学单词书中的单词ID集合
+  const primaryBookWordIds = new Set(
+    wordBookItems
+      ?.filter(item => item.word_book_id === primaryWordBookId)
+      .map(item => item.word_id) || []
+  );
+
+  if (studyMode === 'book-only') {
+    // 只从主学单词书中抽取
+    return dueWords.filter(w => primaryBookWordIds.has(w.id));
+  }
+
+  if (studyMode === 'book-priority') {
+    // 优先主学单词书，但保留其他单词在后面
+    const primaryWords = dueWords.filter(w => primaryBookWordIds.has(w.id));
+    const otherWords = dueWords.filter(w => !primaryBookWordIds.has(w.id));
+    return [...primaryWords, ...otherWords];
+  }
+
+  return dueWords;
+}
+
 export function shuffleWords(words: Word[]): Word[] {
   return [...words].sort(() => Math.random() - 0.5);
 }

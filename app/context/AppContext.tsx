@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { ReactNode } from 'react';
-import type { Word, AppSettings, ReviewStats, AIContext } from '../types';
+import type { Word, AppSettings, ReviewStats, AIContext, WordBook, LearningSequenceItem } from '../types';
 import { useAuth } from './AuthContext';
 import {
   fetchWords,
@@ -16,6 +16,15 @@ import {
   updateContextAPI,
   deleteContextAPI,
 } from '../services/apiClient';
+import {
+  fetchWordBooks,
+  addToLearningSequence,
+  removeFromLearningSequence,
+  setPrimaryWordBook,
+  resetWordBook,
+  createWordBook,
+  deleteWordBook
+} from '../services/wordbookAPI';
 
 interface AppContextType {
   words: Word[];
@@ -34,6 +43,16 @@ interface AppContextType {
   getStats: () => ReviewStats;
   toggleDarkMode: () => Promise<void>;
   isDarkMode: boolean;
+  wordBooks: WordBook[];
+  learningSequence: LearningSequenceItem[];
+  systemBooks: WordBook[];
+  refreshWordBooks: () => Promise<void>;
+  addToSequence: (wordBookId: string, isPrimary?: boolean) => Promise<void>;
+  removeFromSequence: (wordBookId: string) => Promise<void>;
+  setPrimaryBook: (wordBookId: string) => Promise<void>;
+  resetBook: (wordBookId: string) => Promise<void>;
+  createBook: (name: string, description?: string) => Promise<void>;
+  deleteBook: (wordBookId: string) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -46,6 +65,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const lastUserIdRef = useRef<string | null>(null);
+  const [wordBooks, setWordBooks] = useState<WordBook[]>([]);
+  const [learningSequence, setLearningSequence] = useState<LearningSequenceItem[]>([]);
+  const [systemBooks, setSystemBooks] = useState<WordBook[]>([]);
 
   const refreshWords = useCallback(async () => {
     if (!user) return;
@@ -144,6 +166,85 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [user]);
 
+  const refreshWordBooks = useCallback(async () => {
+    if (!user) return;
+    try {
+      const data = await fetchWordBooks(user.id);
+      setSystemBooks(data.systemBooks);
+      setLearningSequence(data.learningSequence);
+      setWordBooks([...data.learningSequence.map((item: any) => item.word_book!).filter(Boolean), ...data.customBooks]);
+    } catch (error) {
+      console.error('Error refreshing wordbooks:', error);
+    }
+  }, [user]);
+
+  const addToSequence = useCallback(async (wordBookId: string, isPrimary = false) => {
+    if (!user) return;
+    try {
+      await addToLearningSequence(user.id, wordBookId, isPrimary);
+      await refreshWordBooks();
+    } catch (error) {
+      console.error('Error adding to sequence:', error);
+      throw error;
+    }
+  }, [user, refreshWordBooks]);
+
+  const removeFromSequence = useCallback(async (wordBookId: string) => {
+    if (!user) return;
+    try {
+      await removeFromLearningSequence(user.id, wordBookId);
+      await refreshWordBooks();
+    } catch (error) {
+      console.error('Error removing from sequence:', error);
+      throw error;
+    }
+  }, [user, refreshWordBooks]);
+
+  const setPrimaryBook = useCallback(async (wordBookId: string) => {
+    if (!user) return;
+    try {
+      await setPrimaryWordBook(user.id, wordBookId);
+      await saveSettings({ ...settings, primaryWordBookId: wordBookId });
+      await refreshWordBooks();
+    } catch (error) {
+      console.error('Error setting primary book:', error);
+      throw error;
+    }
+  }, [user, settings, saveSettings, refreshWordBooks]);
+
+  const resetBook = useCallback(async (wordBookId: string) => {
+    if (!user) return;
+    try {
+      await resetWordBook(wordBookId, user.id);
+      await refreshWordBooks();
+    } catch (error) {
+      console.error('Error resetting book:', error);
+      throw error;
+    }
+  }, [user, refreshWordBooks]);
+
+  const createBook = useCallback(async (name: string, description?: string) => {
+    if (!user) return;
+    try {
+      await createWordBook(user.id, { name, description });
+      await refreshWordBooks();
+    } catch (error) {
+      console.error('Error creating book:', error);
+      throw error;
+    }
+  }, [user, refreshWordBooks]);
+
+  const deleteBook = useCallback(async (wordBookId: string) => {
+    if (!user) return;
+    try {
+      await deleteWordBook(wordBookId, user.id);
+      await refreshWordBooks();
+    } catch (error) {
+      console.error('Error deleting book:', error);
+      throw error;
+    }
+  }, [user, refreshWordBooks]);
+
   const toggleDarkMode = useCallback(async () => {
     const newDarkMode = !isDarkMode;
     setIsDarkMode(newDarkMode);
@@ -190,8 +291,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setSettings(savedSettings);
           setIsDarkMode(savedSettings.darkMode || false);
         }
-        // 并行加载单词和上下文数据
-        await Promise.all([refreshWords(), refreshContexts()]);
+        // 并行加载单词、上下文和单词书数据
+        await Promise.all([refreshWords(), refreshContexts(), refreshWordBooks()]);
         lastUserIdRef.current = user.id;
       } catch (error) {
         console.error('Error loading data:', error);
@@ -200,7 +301,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
     }
     loadData();
-  }, [isAuthenticated, user, refreshWords, refreshContexts]);
+  }, [isAuthenticated, user, refreshWords, refreshContexts, refreshWordBooks]);
 
   const value = useMemo(() => ({
     words,
@@ -219,6 +320,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     getStats,
     toggleDarkMode,
     isDarkMode,
+    wordBooks,
+    learningSequence,
+    systemBooks,
+    refreshWordBooks,
+    addToSequence,
+    removeFromSequence,
+    setPrimaryBook,
+    resetBook,
+    createBook,
+    deleteBook,
   }), [
     words,
     contexts,
@@ -236,6 +347,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     getStats,
     toggleDarkMode,
     isDarkMode,
+    wordBooks,
+    learningSequence,
+    systemBooks,
+    refreshWordBooks,
+    addToSequence,
+    removeFromSequence,
+    setPrimaryBook,
+    resetBook,
+    createBook,
+    deleteBook,
   ]);
 
   return (

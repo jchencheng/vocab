@@ -2,15 +2,21 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
-import { calculateNextReview, getDueWords, shuffleWords, limitWords, postponeToTomorrow, getTodayReviewQueue, postponeWithPriority } from '../utils/spacedRepetition';
+import { calculateNextReview, getDueWords, shuffleWords, limitWords, postponeToTomorrow, getTodayReviewQueue, postponeWithPriority, getDueWordsByStudyMode } from '../utils/spacedRepetition';
 import { getIntervalText, getChineseDefinition, getExampleSentence, playAudio, hasAudio } from '../utils/wordUtils';
 import { QUALITY_LABELS } from '../constants';
 import type { Word } from '../types';
 
 type ReviewMode = 'en-to-cn' | 'cn-to-en';
 
+const STUDY_MODE_LABELS: Record<string, string> = {
+  'book-only': '只学当前书',
+  'book-priority': '优先当前书',
+  'mixed': '全部混合'
+};
+
 export function Review() {
-  const { words, settings, updateWord, refreshWords } = useApp();
+  const { words, settings, updateWord, refreshWords, learningSequence, wordBooks } = useApp();
   const [queue, setQueue] = useState<Word[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showAnswer, setShowAnswer] = useState(false);
@@ -18,8 +24,42 @@ export function Review() {
   const [isComplete, setIsComplete] = useState(false);
   const [postponedCount, setPostponedCount] = useState(0);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [primaryBookWordIds, setPrimaryBookWordIds] = useState<Set<string>>(new Set());
 
   const maxDailyReviews = settings.maxDailyReviews || 50;
+  const studyMode = settings.studyMode || 'mixed';
+  const primaryWordBookId = settings.primaryWordBookId;
+
+  // 获取主学单词书中的单词ID
+  useEffect(() => {
+    if (!primaryWordBookId || studyMode === 'mixed') {
+      setPrimaryBookWordIds(new Set());
+      return;
+    }
+
+    // 从 wordBooks 中找到主学单词书
+    const primaryBook = wordBooks.find(b => b.id === primaryWordBookId);
+    if (!primaryBook) {
+      setPrimaryBookWordIds(new Set());
+      return;
+    }
+
+    // 获取该单词书的所有单词ID
+    const fetchPrimaryBookWords = async () => {
+      try {
+        const response = await fetch(`/api/wordbooks/${primaryWordBookId}/words?pageSize=10000`);
+        if (response.ok) {
+          const data = await response.json();
+          const wordIds = new Set<string>(data.items?.map((item: any) => item.word_id as string) || []);
+          setPrimaryBookWordIds(wordIds);
+        }
+      } catch (error) {
+        console.error('Error fetching primary book words:', error);
+      }
+    };
+
+    fetchPrimaryBookWords();
+  }, [primaryWordBookId, studyMode, wordBooks]);
 
   // 初始化复习队列，并自动推迟超出限制的单词
   // 只在组件挂载时执行一次，避免 updateWord 后重置进度
@@ -27,8 +67,25 @@ export function Review() {
     if (isInitialized) return;
     
     const initReviewQueue = async () => {
-      // 获取今日复习队列和需要推迟的单词
-      const { todayQueue, postponedWords } = getTodayReviewQueue(words, maxDailyReviews);
+      // 根据学习模式获取待复习单词
+      let dueWords: Word[];
+      
+      if (studyMode === 'mixed' || !primaryWordBookId || primaryBookWordIds.size === 0) {
+        // 混合模式或没有主学单词书，使用所有单词
+        dueWords = getDueWords(words);
+      } else {
+        // 根据学习模式筛选
+        dueWords = getDueWordsByStudyMode(words, studyMode, primaryWordBookId, 
+          Array.from(primaryBookWordIds).map(id => ({ word_id: id, word_book_id: primaryWordBookId }))
+        );
+      }
+      
+      // 打乱顺序并限制数量
+      const shuffled = shuffleWords(dueWords);
+      const limited = limitWords(shuffled, maxDailyReviews);
+      
+      // 获取需要推迟的单词
+      const postponedWords = shuffled.slice(maxDailyReviews);
       
       // 如果有需要推迟的单词，自动推迟它们
       if (postponedWords.length > 0) {
@@ -39,7 +96,7 @@ export function Review() {
         }
       }
       
-      setQueue(todayQueue);
+      setQueue(limited);
       setCurrentIndex(0);
       setShowAnswer(false);
       setIsComplete(false);
@@ -48,7 +105,7 @@ export function Review() {
     };
     
     initReviewQueue();
-  }, [words, maxDailyReviews, updateWord, isInitialized]);
+  }, [words, maxDailyReviews, updateWord, isInitialized, studyMode, primaryWordBookId, primaryBookWordIds]);
 
   const currentWord = queue[currentIndex];
   // 进度从0%开始，完成所有单词后达到100%
@@ -97,8 +154,25 @@ export function Review() {
     // 重置初始化状态，强制重新加载队列
     setIsInitialized(false);
     
-    // 获取今日复习队列和需要推迟的单词
-    const { todayQueue, postponedWords } = getTodayReviewQueue(words, maxDailyReviews);
+    // 根据学习模式获取待复习单词
+    let dueWords: Word[];
+    
+    if (studyMode === 'mixed' || !primaryWordBookId || primaryBookWordIds.size === 0) {
+      // 混合模式或没有主学单词书，使用所有单词
+      dueWords = getDueWords(words);
+    } else {
+      // 根据学习模式筛选
+      dueWords = getDueWordsByStudyMode(words, studyMode, primaryWordBookId, 
+        Array.from(primaryBookWordIds).map(id => ({ word_id: id, word_book_id: primaryWordBookId }))
+      );
+    }
+    
+    // 打乱顺序并限制数量
+    const shuffled = shuffleWords(dueWords);
+    const limited = limitWords(shuffled, maxDailyReviews);
+    
+    // 获取需要推迟的单词
+    const postponedWords = shuffled.slice(maxDailyReviews);
     
     // 如果有需要推迟的单词，自动推迟它们
     if (postponedWords.length > 0) {
@@ -109,13 +183,13 @@ export function Review() {
       }
     }
     
-    setQueue(todayQueue);
+    setQueue(limited);
     setCurrentIndex(0);
     setShowAnswer(false);
     setIsComplete(false);
     setPostponedCount(postponedWords.length);
     setIsInitialized(true);
-  }, [words, maxDailyReviews, updateWord]);
+  }, [words, maxDailyReviews, updateWord, studyMode, primaryWordBookId, primaryBookWordIds]);
 
   if (queue.length === 0) {
     return (
@@ -125,9 +199,17 @@ export function Review() {
           <h2 className="font-display text-3xl font-bold text-slate-900 dark:text-white mb-4">
             No words to review!
           </h2>
-          <p className="text-slate-600 dark:text-slate-400 mb-8 text-lg">
+          <p className="text-slate-600 dark:text-slate-400 mb-4 text-lg">
             You&apos;ve completed all your reviews for today. Great job!
           </p>
+          {settings.studyMode && settings.studyMode !== 'mixed' && (
+            <p className="text-sm text-slate-500 dark:text-slate-500 mb-8">
+              当前学习模式: {STUDY_MODE_LABELS[settings.studyMode]}
+              {settings.primaryWordBookId && learningSequence.find((s: any) => s.wordBook?.id === settings.primaryWordBookId)?.wordBook?.name && (
+                <span> ({learningSequence.find((s: any) => s.wordBook?.id === settings.primaryWordBookId)?.wordBook?.name})</span>
+              )}
+            </p>
+          )}
           <button
             onClick={handleRestart}
             className="px-8 py-4 bg-gradient-to-r from-primary-600 to-accent-600 text-white rounded-2xl font-semibold hover:opacity-90 transition-all shadow-soft hover:shadow-medium active:scale-[0.98]"

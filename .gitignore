@@ -39,3 +39,13 @@ out/
 
 # Build outputs
 build/
+
+# 敏感数据文件（词典数据库、单词数据源）
+*.db
+*.sqlite
+*.sqlite3
+*.xlsx
+*.xls
+/data/
+/dictionaries/
+/scripts/data/

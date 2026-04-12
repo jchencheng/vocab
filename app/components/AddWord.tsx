@@ -2,12 +2,17 @@
 
 import { useState, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
 import { fetchWordFromDictionary, translateDefinitionsToChinese } from '../services/dictionaryAPI';
+import { checkWordExists, addWordWithCheck } from '../services/wordAPI';
 import { parseTags } from '../utils/formatters';
-import type { Word } from '../types';
+import { DuplicateWarning } from './DuplicateWarning';
+import { BuiltinMeaningsCard } from './BuiltinMeaningsCard';
+import type { Word, WordCheckResult } from '../types';
 
 export function AddWord() {
   const { addWord } = useApp();
+  const { user } = useAuth();
   const [word, setWord] = useState('');
   const [phonetic, setPhonetic] = useState('');
   const [tags, setTags] = useState('');
@@ -29,9 +34,15 @@ export function AddWord() {
   ]);
   const [isLoading, setIsLoading] = useState(false);
   const [isTranslating, setIsTranslating] = useState(false);
+  const [isChecking, setIsChecking] = useState(false);
   const [error, setError] = useState('');
   const [modelMessage, setModelMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+
+  // 检查相关状态
+  const [checkResult, setCheckResult] = useState<WordCheckResult | null>(null);
+  const [showBuiltinCard, setShowBuiltinCard] = useState(false);
+  const [useBuiltinMeanings, setUseBuiltinMeanings] = useState(false);
 
   const handleAddMeaning = useCallback(() => {
     setMeanings([
@@ -89,9 +100,7 @@ export function AddWord() {
           if (index === meaningIndex) {
             return {
               ...meaning,
-              definitions: meaning.definitions.filter(
-                (_d: { definition: string; example?: string; chineseDefinition?: string }, i: number) => i !== definitionIndex
-              ),
+              definitions: meaning.definitions.filter((_, i: number) => i !== definitionIndex),
             };
           }
           return meaning;
@@ -100,6 +109,47 @@ export function AddWord() {
     },
     [meanings]
   );
+
+  // 检查单词是否存在
+  const handleCheckWord = useCallback(async () => {
+    if (!word.trim()) {
+      setError('Please enter a word');
+      return;
+    }
+
+    if (!user) {
+      setError('Please login first');
+      return;
+    }
+
+    setIsChecking(true);
+    setError('');
+    setCheckResult(null);
+    setShowBuiltinCard(false);
+    setUseBuiltinMeanings(false);
+
+    try {
+      const result = await checkWordExists(word.trim(), user.id);
+      setCheckResult(result);
+
+      if (result.existsInUserLibrary) {
+        // 单词已存在于用户词库，显示警告
+        setModelMessage(`"${word.trim()}" 已在您的词库中`);
+      } else if (result.existsInBuiltin && result.builtinWord) {
+        // 单词存在于系统词库，显示内置释义
+        setShowBuiltinCard(true);
+        setModelMessage(`"${word.trim()}" 存在于系统词库，可使用内置释义`);
+      } else {
+        // 单词不存在，继续从 API 获取
+        setModelMessage(`"${word.trim()}" 是新单词，可从词典 API 获取释义`);
+      }
+    } catch (err: any) {
+      console.error('Error checking word:', err);
+      setError('检查单词失败: ' + err.message);
+    } finally {
+      setIsChecking(false);
+    }
+  }, [word]);
 
   // 从 Free Dictionary API 获取英文释义
   const handleGetDefinitions = useCallback(async () => {
@@ -132,7 +182,7 @@ export function AddWord() {
 
   // 翻译中文释义
   const handleTranslateChinese = useCallback(async () => {
-    if (meanings.every(m => m.definitions.every((d: { chineseDefinition?: string }) => d.chineseDefinition))) {
+    if (meanings.every(m => m.definitions.every(d => d.chineseDefinition))) {
       setError('所有释义已有中文翻译');
       return;
     }
@@ -146,7 +196,7 @@ export function AddWord() {
       const definitionsToTranslate: { meaningIndex: number; defIndex: number; definition: string; example: string }[] = [];
       
       meanings.forEach((meaning, mIndex) => {
-        meaning.definitions.forEach((def: { chineseDefinition?: string; definition: string; example?: string }, dIndex: number) => {
+        meaning.definitions.forEach((def, dIndex: number) => {
           if (!def.chineseDefinition && def.definition) {
             definitionsToTranslate.push({
               meaningIndex: mIndex,
@@ -188,6 +238,54 @@ export function AddWord() {
     }
   }, [meanings]);
 
+  // 使用内置释义
+  const handleUseBuiltinMeanings = useCallback(() => {
+    if (checkResult?.builtinWord) {
+      setPhonetic(checkResult.builtinWord.phonetic || '');
+      setMeanings(checkResult.builtinWord.meanings);
+      setUseBuiltinMeanings(true);
+      setShowBuiltinCard(false);
+      setModelMessage('已使用系统内置释义');
+    }
+  }, [checkResult]);
+
+  // 添加自定义释义（保留内置释义）
+  const handleAddCustomMeanings = useCallback(() => {
+    setUseBuiltinMeanings(false);
+    setShowBuiltinCard(false);
+    setModelMessage('请添加您的自定义释义');
+  }, []);
+
+  // 取消添加（单词已存在）
+  const handleCancelAdd = useCallback(() => {
+    setCheckResult(null);
+    setWord('');
+    setPhonetic('');
+    setMeanings([
+      {
+        partOfSpeech: 'noun',
+        definitions: [
+          {
+            definition: '',
+            example: '',
+            chineseDefinition: '',
+            synonyms: [],
+            antonyms: [],
+          },
+        ],
+        synonyms: [],
+        antonyms: [],
+      },
+    ]);
+    setModelMessage('');
+  }, []);
+
+  // 强制添加（单词已存在但用户仍要添加）
+  const handleForceAdd = useCallback(() => {
+    setCheckResult(null);
+    setModelMessage('您可以继续添加此单词（将创建新记录）');
+  }, []);
+
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -201,24 +299,22 @@ export function AddWord() {
       return;
     }
 
+    if (!user) {
+      setError('Please login first');
+      return;
+    }
+
     try {
-      const newWord: Word = {
-        id: crypto.randomUUID(),
+      // 使用新的 API 添加单词
+      const newWord = await addWordWithCheck({
         word: word.trim(),
         phonetic: phonetic.trim(),
-        phonetics: [],
         meanings: meanings,
         tags: parseTags(tags),
-        interval: 1,
-        easeFactor: 2.5,
-        reviewCount: 0,
-        quality: 0,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        nextReviewAt: Date.now(),
-      };
-
-      await addWord(newWord);
+        userId: user.id,
+        useBuiltinMeanings,
+        originalWordId: checkResult?.builtinWord?.id,
+      });
 
       // 显示成功提示
       setSuccessMessage(`"${newWord.word}" added successfully!`);
@@ -250,11 +346,14 @@ export function AddWord() {
       ]);
       setError('');
       setModelMessage('');
+      setCheckResult(null);
+      setShowBuiltinCard(false);
+      setUseBuiltinMeanings(false);
     } catch (err) {
       setError('Failed to add word');
       setSuccessMessage('');
     }
-  }, [word, phonetic, tags, meanings, addWord]);
+  }, [word, phonetic, tags, meanings, useBuiltinMeanings, checkResult]);
 
   return (
     <div className="w-full max-w-4xl mx-auto">
@@ -277,6 +376,24 @@ export function AddWord() {
           </div>
         )}
 
+        {/* 重复单词警告 */}
+        {checkResult?.existsInUserLibrary && (
+          <DuplicateWarning
+            word={checkResult.userWord}
+            onCancel={handleCancelAdd}
+            onForceAdd={handleForceAdd}
+          />
+        )}
+
+        {/* 内置释义卡片 */}
+        {showBuiltinCard && checkResult?.builtinWord && (
+          <BuiltinMeaningsCard
+            word={checkResult.builtinWord}
+            onUseBuiltin={handleUseBuiltinMeanings}
+            onAddCustom={handleAddCustomMeanings}
+          />
+        )}
+
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-6">Add New Word</h2>
 
@@ -293,6 +410,14 @@ export function AddWord() {
                   className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Enter a word"
                 />
+                <button
+                  type="button"
+                  onClick={handleCheckWord}
+                  disabled={isChecking || !word.trim()}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isChecking ? 'Checking...' : 'Check Word'}
+                </button>
                 <button
                   type="button"
                   onClick={handleGetDefinitions}
@@ -334,7 +459,14 @@ export function AddWord() {
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">Meanings</h3>
+            <h3 className="text-lg font-semibold text-gray-900">
+              Meanings
+              {useBuiltinMeanings && (
+                <span className="ml-2 text-sm font-normal text-purple-600 bg-purple-50 px-2 py-1 rounded">
+                  使用系统内置释义
+                </span>
+              )}
+            </h3>
             <div className="flex gap-2">
               <button
                 type="button"
@@ -393,7 +525,7 @@ export function AddWord() {
                 </div>
 
                 <div className="space-y-4">
-                  {meaning.definitions.map((def: { definition: string; example?: string; chineseDefinition?: string }, defIndex: number) => (
+                  {meaning.definitions.map((def, defIndex: number) => (
                     <div
                       key={defIndex}
                       className="bg-gray-50 rounded-lg p-4 space-y-3"
@@ -410,11 +542,10 @@ export function AddWord() {
                                 mi === meaningIndex
                                   ? {
                                       ...m,
-                                      definitions: m.definitions.map(
-                                        (d: { definition: string; example?: string; chineseDefinition?: string }, di: number) =>
-                                          di === defIndex
-                                            ? { ...d, definition: e.target.value }
-                                            : d
+                                      definitions: m.definitions.map((d, di: number) =>
+                                        di === defIndex
+                                          ? { ...d, definition: e.target.value }
+                                          : d
                                       ),
                                     }
                                   : m
@@ -439,11 +570,10 @@ export function AddWord() {
                                 mi === meaningIndex
                                   ? {
                                       ...m,
-                                      definitions: m.definitions.map(
-                                        (d: { definition: string; example?: string; chineseDefinition?: string }, di: number) =>
-                                          di === defIndex
-                                            ? { ...d, example: e.target.value }
-                                            : d
+                                      definitions: m.definitions.map((d, di: number) =>
+                                        di === defIndex
+                                          ? { ...d, example: e.target.value }
+                                          : d
                                       ),
                                     }
                                   : m
@@ -468,11 +598,10 @@ export function AddWord() {
                                 mi === meaningIndex
                                   ? {
                                       ...m,
-                                      definitions: m.definitions.map(
-                                        (d: { definition: string; example?: string; chineseDefinition?: string }, di: number) =>
-                                          di === defIndex
-                                            ? { ...d, chineseDefinition: e.target.value }
-                                            : d
+                                      definitions: m.definitions.map((d, di: number) =>
+                                        di === defIndex
+                                          ? { ...d, chineseDefinition: e.target.value }
+                                          : d
                                       ),
                                     }
                                   : m

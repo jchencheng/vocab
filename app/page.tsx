@@ -6,12 +6,13 @@ import { Login } from './components/Login';
 import { Navbar } from './components/Navbar';
 import { WordList } from './components/WordList';
 import { AddWord } from './components/AddWord';
+import { WordBookList } from './components/WordBookList';
 import { Review } from './components/Review';
 import { Settings } from './components/Settings';
 import { AIMemory } from './components/AIMemory';
 import { useState } from 'react';
 
-type View = 'list' | 'add' | 'review' | 'settings' | 'ai-memory';
+type View = 'list' | 'add' | 'wordbooks' | 'review' | 'settings' | 'ai-memory';
 
 export default function Home() {
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
@@ -37,6 +38,7 @@ export default function Home() {
         <div className="animate-fade-in">
           {currentView === 'list' && <WordList />}
           {currentView === 'add' && <AddWord />}
+          {currentView === 'wordbooks' && <WordBookList />}
           {currentView === 'review' && <Review />}
           {currentView === 'settings' && <Settings />}
           {currentView === 'ai-memory' && <AIMemory />}

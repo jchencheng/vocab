@@ -74,24 +74,109 @@ export async function GET(request: NextRequest) {
 // POST /api/words
 export async function POST(request: NextRequest) {
   try {
-    const { word, userId } = await request.json();
+    const body = await request.json();
+    const { word, userId, useBuiltinMeanings, originalWordId } = body;
 
     if (!word || !userId) {
       return NextResponse.json({ error: 'word and userId are required' }, { status: 400 });
     }
 
-    const dbWord = mapWordToDB(word);
-
-    const { error } = await supabase
+    // 检查用户是否已添加过该单词
+    const { data: existingWord, error: checkError } = await supabase
       .from('words')
-      .insert({ ...dbWord, user_id: userId });
+      .select('*')
+      .eq('user_id', userId)
+      .ilike('word', word.word.trim())
+      .single();
 
-    if (error) {
-      console.error('Error adding word:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    if (checkError && checkError.code !== 'PGRST116') {
+      console.error('Error checking existing word:', checkError);
+      return NextResponse.json({ error: checkError.message }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true }, { status: 201 });
+    // 如果单词已存在，返回错误
+    if (existingWord) {
+      return NextResponse.json(
+        { error: 'Word already exists in your library', word: mapWordFromDB(existingWord) },
+        { status: 409 }
+      );
+    }
+
+    // 准备单词数据
+    const wordData = {
+      ...word,
+      id: crypto.randomUUID(),
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+
+    const dbWord = mapWordToDB(wordData);
+
+    // 插入单词
+    const { data: newWord, error: wordError } = await supabase
+      .from('words')
+      .insert({ ...dbWord, user_id: userId })
+      .select()
+      .single();
+
+    if (wordError) {
+      console.error('Error adding word:', wordError);
+      return NextResponse.json({ error: wordError.message }, { status: 500 });
+    }
+
+    // 查找或创建"自定义单词本"
+    let { data: customBook } = await supabase
+      .from('word_books')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('name', '自定义单词本')
+      .single();
+
+    if (!customBook) {
+      // 创建自定义单词本
+      const { data: newBook, error: bookError } = await supabase
+        .from('word_books')
+        .insert({
+          user_id: userId,
+          name: '自定义单词本',
+          description: '用户手动添加的单词',
+          source_type: 'custom',
+          word_count: 0
+        })
+        .select()
+        .single();
+
+      if (bookError) {
+        console.error('Error creating custom wordbook:', bookError);
+      } else {
+        customBook = newBook;
+      }
+    }
+
+    // 将单词关联到自定义单词本
+    if (customBook) {
+      await supabase
+        .from('word_book_items')
+        .insert({
+          word_book_id: customBook.id,
+          word_id: newWord.id,
+          status: 'learning'
+        });
+
+      // 更新单词书单词计数
+      const { data: countData } = await supabase
+        .from('word_book_items')
+        .select('id', { count: 'exact' })
+        .eq('word_book_id', customBook.id);
+
+      await supabase
+        .from('word_books')
+        .update({ word_count: countData?.length || 0 })
+        .eq('id', customBook.id);
+    }
+
+    // 返回添加的单词（使用驼峰式字段名）
+    return NextResponse.json(mapWordFromDB(newWord), { status: 201 });
   } catch (error: any) {
     console.error('API error:', error);
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
