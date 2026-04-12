@@ -69,7 +69,10 @@ export function WordBookList() {
   }, [settings, saveSettings]);
 
   const handleAddToSequence = async (bookId: string) => {
-    if (!user) return;
+    if (!user) {
+      alert('请先登录');
+      return;
+    }
     try {
       const isFirstBook = learningSequence.length === 0;
       await addToLearningSequence(user.id, bookId, isFirstBook);
@@ -77,9 +80,15 @@ export function WordBookList() {
       if (isFirstBook) {
         await saveSettings({ ...settings, primaryWordBookId: bookId });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error adding to sequence:', error);
-      alert('添加到学习序列失败');
+      if (error.message?.includes('already in learning sequence')) {
+        alert('该单词书已经在学习序列中');
+      } else if (error.message?.includes('User ID and WordBook ID are required')) {
+        alert('用户信息错误，请重新登录');
+      } else {
+        alert('添加到学习序列失败: ' + (error.message || '未知错误'));
+      }
     }
   };
 
@@ -214,6 +223,7 @@ export function WordBookList() {
                 book={book}
                 inSequence={false}
                 onAddToSequence={() => handleAddToSequence(book.id)}
+                onViewDetail={() => router.push(`/wordbooks/${book.id}`)}
               />
             ))}
           </div>
