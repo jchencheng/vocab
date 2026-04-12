@@ -115,6 +115,84 @@ export function limitWords(words: Word[], limit: number): Word[] {
 }
 
 /**
+ * 计算单词的记忆难度评分 (0-100，分数越高越困难)
+ * 基于 quality, easeFactor, interval, reviewCount 综合评估
+ */
+export function calculateMemoryDifficulty(word: Word): number {
+  let difficulty = 0;
+  
+  // 1. 质量评分影响 (quality: 0-5，越低越困难)
+  if (word.quality <= 2) {
+    difficulty += 40;
+  } else if (word.quality === 3) {
+    difficulty += 20;
+  }
+  
+  // 2. 易度因子影响 (easeFactor: 默认 2.5，越低越困难)
+  if (word.easeFactor < 2.0) {
+    difficulty += 25;
+  } else if (word.easeFactor < 2.3) {
+    difficulty += 15;
+  }
+  
+  // 3. 复习次数影响 (复习次数多但 interval 短 = 记不住)
+  if (word.reviewCount >= 3 && word.interval < 7) {
+    difficulty += 20;
+  }
+  
+  // 4. 间隔天数影响 (长期没复习的单词)
+  const daysSinceReview = Math.floor((Date.now() - word.nextReviewAt) / (24 * 60 * 60 * 1000));
+  if (daysSinceReview > 0) {
+    difficulty += Math.min(daysSinceReview * 2, 15);
+  }
+  
+  return Math.min(difficulty, 100);
+}
+
+/**
+ * 按记忆难度排序，优先选择最困难的单词
+ * @param words 单词列表
+ * @param count 选择数量
+ * @param minDifficulty 最小难度阈值 (默认30)
+ */
+export function selectDifficultWords(
+  words: Word[], 
+  count: number = 10, 
+  minDifficulty: number = 30
+): Word[] {
+  return words
+    .map(w => ({ word: w, difficulty: calculateMemoryDifficulty(w) }))
+    .filter(w => w.difficulty >= minDifficulty)
+    .sort((a, b) => b.difficulty - a.difficulty)
+    .slice(0, count)
+    .map(w => w.word);
+}
+
+/**
+ * 混合模式：70% 困难单词 + 30% 随机单词
+ * @param words 单词列表
+ * @param count 选择数量
+ */
+export function selectMixedWords(words: Word[], count: number = 10): Word[] {
+  const difficultCount = Math.floor(count * 0.7);
+  const randomCount = count - difficultCount;
+  
+  // 获取困难单词（多选一些用于备选）
+  const difficultWords = selectDifficultWords(words, difficultCount * 2, 20);
+  
+  // 获取随机单词（排除已选的困难单词）
+  const difficultIds = new Set(difficultWords.map(w => w.id));
+  const remainingWords = words.filter(w => !difficultIds.has(w.id));
+  const randomWords = shuffleWords(remainingWords).slice(0, randomCount);
+  
+  // 合并后再次随机排序
+  return shuffleWords([
+    ...difficultWords.slice(0, difficultCount), 
+    ...randomWords
+  ]);
+}
+
+/**
  * 按间隔排序（间隔长的优先）
  * 间隔相同的情况下，按复习次数排序（复习次数多的优先）
  */

@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { Pagination } from './Pagination';
 import { generateContent } from '../services/apiClient';
 import { formatWithBionicReading, formatShortDate } from '../utils/formatters';
-import type { Word, AIContext } from '../types';
+import { calculateMemoryDifficulty, selectDifficultWords, selectMixedWords } from '../utils/spacedRepetition';
+import type { Word, AIContext, SelectionMode } from '../types';
 
 const ITEMS_PER_PAGE = 5;
 
@@ -20,6 +21,11 @@ export function AIMemory() {
   const [showBionic, setShowBionic] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [historyBionicStates, setHistoryBionicStates] = useState<Record<string, boolean>>({});
+  
+  // 新增：抽选模式状态
+  const [selectionMode, setSelectionMode] = useState<SelectionMode>('difficult');
+  const [recommendedWords, setRecommendedWords] = useState<Word[]>([]);
+  const [showWordDetails, setShowWordDetails] = useState(false);
 
   const toggleWordSelection = useCallback((wordId: string) => {
     setSelectedWords(prev => {
@@ -36,6 +42,36 @@ export function AIMemory() {
   const selectedWordsList = useMemo(() => {
     return words.filter(w => selectedWords.has(w.id));
   }, [words, selectedWords]);
+
+  // 新增：根据抽选模式自动选择单词
+  const autoSelectWords = useCallback(() => {
+    if (words.length === 0) return;
+    
+    let selected: Word[] = [];
+    
+    switch (selectionMode) {
+      case 'difficult':
+        selected = selectDifficultWords(words, 10);
+        break;
+      case 'mixed':
+        selected = selectMixedWords(words, 10);
+        break;
+      case 'manual':
+        // 手动模式：保留当前选择
+        return;
+    }
+    
+    // 更新选中的单词集合
+    setSelectedWords(new Set(selected.map(w => w.id)));
+    setRecommendedWords(selected);
+  }, [words, selectionMode]);
+
+  // 新增：当模式改变或单词变化时自动抽选
+  useEffect(() => {
+    if (selectionMode !== 'manual' && activeTab === 'generate') {
+      autoSelectWords();
+    }
+  }, [selectionMode, words, activeTab, autoSelectWords]);
 
   // 分页逻辑
   const totalPages = Math.ceil(contexts.length / ITEMS_PER_PAGE);
@@ -284,14 +320,88 @@ Format your response as a JSON object with this structure:
         <div className="p-8">
           {activeTab === 'generate' ? (
             <div className="space-y-8">
+              {/* 新增：抽选模式选择 */}
               <div>
-                <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-                  <span>📝</span>
-                  Select Words
-                  <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
-                    ({selectedWords.size} selected)
-                  </span>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-3 flex items-center gap-2">
+                  <span>🎯</span>
+                  抽选模式
                 </h3>
+                <div className="flex gap-2 p-1 bg-slate-100 dark:bg-slate-700/50 rounded-xl">
+                  {[
+                    { key: 'difficult', label: '记忆困难优先', icon: '🔥' },
+                    { key: 'mixed', label: '混合模式', icon: '🎲' },
+                    { key: 'manual', label: '手动选择', icon: '✋' },
+                  ].map((mode) => (
+                    <button
+                      key={mode.key}
+                      onClick={() => setSelectionMode(mode.key as SelectionMode)}
+                      className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${
+                        selectionMode === mode.key
+                          ? 'bg-white dark:bg-slate-600 shadow-sm text-primary-600 dark:text-primary-400'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                      }`}
+                    >
+                      <span className="mr-1">{mode.icon}</span>
+                      {mode.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 新增：选中的单词显示 */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <span>📝</span>
+                    {selectionMode === 'manual' ? '选择单词' : '推荐单词'}
+                    <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
+                      ({selectedWords.size} 个)
+                    </span>
+                  </h3>
+                  {selectionMode !== 'manual' && (
+                    <button
+                      onClick={autoSelectWords}
+                      className="text-sm text-primary-600 hover:text-primary-700 flex items-center gap-1"
+                    >
+                      <span>🔄</span> 重新抽选
+                    </button>
+                  )}
+                </div>
+
+                {/* 新增：显示推荐单词详情 */}
+                {recommendedWords.length > 0 && selectionMode !== 'manual' && (
+                  <div className="mb-3 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                        💡 这些单词最近复习质量较低，建议重点记忆
+                      </span>
+                      <button
+                        onClick={() => setShowWordDetails(!showWordDetails)}
+                        className="text-xs text-amber-600 hover:text-amber-700"
+                      >
+                        {showWordDetails ? '隐藏详情' : '查看详情'}
+                      </button>
+                    </div>
+                    {showWordDetails && (
+                      <div className="space-y-1 text-xs text-amber-700 dark:text-amber-300">
+                        {recommendedWords.slice(0, 5).map(word => {
+                          const difficulty = calculateMemoryDifficulty(word);
+                          return (
+                            <div key={word.id} className="flex items-center gap-2">
+                              <span className="font-medium">{word.word}</span>
+                              <span className="text-amber-600">难度: {difficulty}%</span>
+                              <span className="text-slate-400">
+                                (Q:{word.quality} E:{word.easeFactor.toFixed(1)})
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 单词标签 */}
                 {words.length === 0 ? (
                   <div className="text-center py-12 text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-700/50 rounded-2xl border border-slate-200 dark:border-slate-600/50">
                     <div className="text-4xl mb-4">📖</div>
@@ -301,19 +411,30 @@ Format your response as a JSON object with this structure:
                 ) : (
                   <div className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-2xl border border-slate-200 dark:border-slate-600/50">
                     <div className="flex flex-wrap gap-2.5 max-h-48 overflow-y-auto">
-                      {words.map(word => (
-                        <button
-                          key={word.id}
-                          onClick={() => toggleWordSelection(word.id)}
-                          className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-                            selectedWords.has(word.id)
-                              ? 'bg-gradient-to-r from-primary-500 to-accent-500 text-white shadow-soft scale-105'
-                              : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-600 hover:border-primary-300 dark:hover:border-primary-700 hover:shadow-soft'
-                          }`}
-                        >
-                          {word.word}
-                        </button>
-                      ))}
+                      {words.map(word => {
+                        const isSelected = selectedWords.has(word.id);
+                        const difficulty = selectionMode !== 'manual' ? calculateMemoryDifficulty(word) : 0;
+                        
+                        return (
+                          <button
+                            key={word.id}
+                            onClick={() => selectionMode === 'manual' && toggleWordSelection(word.id)}
+                            disabled={selectionMode !== 'manual'}
+                            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all relative ${
+                              isSelected
+                                ? 'bg-gradient-to-r from-primary-500 to-accent-500 text-white shadow-soft'
+                                : 'bg-white dark:bg-slate-800 text-slate-400 border border-slate-200 dark:border-slate-600'
+                            } ${selectionMode !== 'manual' ? 'cursor-default' : 'cursor-pointer hover:shadow-soft'}`}
+                          >
+                            {word.word}
+                            {isSelected && difficulty > 0 && (
+                              <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-[10px] flex items-center justify-center text-white">
+                                {difficulty >= 70 ? '!' : ''}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -332,7 +453,7 @@ Format your response as a JSON object with this structure:
                 ) : (
                   <span className="flex items-center justify-center gap-2">
                     <span>✨</span>
-                    Generate Story
+                    Generate Story ({selectedWords.size} words)
                   </span>
                 )}
               </button>

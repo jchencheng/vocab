@@ -67,6 +67,9 @@ export interface Definition {
 // 从 wordbook.ts 重新导出
 export * from './wordbook';
 
+// AI Memory Assistant 抽选模式
+export type SelectionMode = 'difficult' | 'mixed' | 'manual';
+
 // 单词检查结果
 export interface WordCheckResult {
   userWord?: Word;      // 用户已添加的单词
