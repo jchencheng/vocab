@@ -1,0 +1,34 @@
+# 敏感数据文件 - 确保不会部署到 Vercel
+stardict.db
+*.db
+*.sqlite
+*.sqlite3
+*.xlsx
+*.xls
+data/
+dictionaries/
+scripts/data/
+supabase/.temp/
+
+# 开发环境文件
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# 日志
+logs
+*.log
+npm-debug.log*
+
+# 依赖和构建
+node_modules
+.next/
+dist/
+build/
+.vercel/
+
+# 测试文件
+test_wordbook_feature.py
+*.test.py

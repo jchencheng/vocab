@@ -46,6 +46,8 @@ build/
 *.sqlite3
 *.xlsx
 *.xls
-/data/
-/dictionaries/
-/scripts/data/
+stardict.db
+data/
+dictionaries/
+scripts/data/
+supabase/.temp/
