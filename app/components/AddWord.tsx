@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { fetchWordFromDictionary, translateDefinitionsToChinese } from '../services/dictionaryAPI';
@@ -16,22 +16,7 @@ export function AddWord() {
   const [word, setWord] = useState('');
   const [phonetic, setPhonetic] = useState('');
   const [tags, setTags] = useState('');
-  const [meanings, setMeanings] = useState<Word['meanings']>([
-    {
-      partOfSpeech: 'noun',
-      definitions: [
-        {
-          definition: '',
-          example: '',
-          chineseDefinition: '',
-          synonyms: [],
-          antonyms: [],
-        },
-      ],
-      synonyms: [],
-      antonyms: [],
-    },
-  ]);
+  const [meanings, setMeanings] = useState<Word['meanings']>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isTranslating, setIsTranslating] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
@@ -43,6 +28,72 @@ export function AddWord() {
   const [checkResult, setCheckResult] = useState<WordCheckResult | null>(null);
   const [showBuiltinCard, setShowBuiltinCard] = useState(false);
   const [useBuiltinMeanings, setUseBuiltinMeanings] = useState(false);
+  const [hasChecked, setHasChecked] = useState(false);
+
+  // 防抖定时器
+  const checkTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // 自动检查单词（防抖）
+  useEffect(() => {
+    // 清除之前的定时器
+    if (checkTimeoutRef.current) {
+      clearTimeout(checkTimeoutRef.current);
+    }
+
+    // 重置检查状态
+    setCheckResult(null);
+    setShowBuiltinCard(false);
+    setUseBuiltinMeanings(false);
+    setHasChecked(false);
+    setModelMessage('');
+
+    // 如果单词为空，不检查
+    if (!word.trim() || !user) {
+      return;
+    }
+
+    // 设置防抖定时器，1秒后检查
+    checkTimeoutRef.current = setTimeout(async () => {
+      await performCheck(word.trim());
+    }, 1000);
+
+    return () => {
+      if (checkTimeoutRef.current) {
+        clearTimeout(checkTimeoutRef.current);
+      }
+    };
+  }, [word, user]);
+
+  // 执行检查
+  const performCheck = async (wordToCheck: string) => {
+    if (!user) return;
+
+    setIsChecking(true);
+    setError('');
+
+    try {
+      const result = await checkWordExists(wordToCheck, user.id);
+      setCheckResult(result);
+      setHasChecked(true);
+
+      if (result.existsInUserLibrary) {
+        // 单词已存在于用户词库，显示警告
+        setModelMessage(`"${wordToCheck}" 已在您的词库中`);
+      } else if (result.existsInBuiltin && result.builtinWord) {
+        // 单词存在于系统词库，显示内置释义
+        setShowBuiltinCard(true);
+        setModelMessage(`"${wordToCheck}" 存在于系统词库，可使用内置释义`);
+      } else {
+        // 单词不存在
+        setModelMessage(`"${wordToCheck}" 是新单词`);
+      }
+    } catch (err: any) {
+      console.error('Error checking word:', err);
+      // 不显示错误给用户，静默失败
+    } finally {
+      setIsChecking(false);
+    }
+  };
 
   const handleAddMeaning = useCallback(() => {
     setMeanings([
@@ -110,47 +161,6 @@ export function AddWord() {
     [meanings]
   );
 
-  // 检查单词是否存在
-  const handleCheckWord = useCallback(async () => {
-    if (!word.trim()) {
-      setError('Please enter a word');
-      return;
-    }
-
-    if (!user) {
-      setError('Please login first');
-      return;
-    }
-
-    setIsChecking(true);
-    setError('');
-    setCheckResult(null);
-    setShowBuiltinCard(false);
-    setUseBuiltinMeanings(false);
-
-    try {
-      const result = await checkWordExists(word.trim(), user.id);
-      setCheckResult(result);
-
-      if (result.existsInUserLibrary) {
-        // 单词已存在于用户词库，显示警告
-        setModelMessage(`"${word.trim()}" 已在您的词库中`);
-      } else if (result.existsInBuiltin && result.builtinWord) {
-        // 单词存在于系统词库，显示内置释义
-        setShowBuiltinCard(true);
-        setModelMessage(`"${word.trim()}" 存在于系统词库，可使用内置释义`);
-      } else {
-        // 单词不存在，继续从 API 获取
-        setModelMessage(`"${word.trim()}" 是新单词，可从词典 API 获取释义`);
-      }
-    } catch (err: any) {
-      console.error('Error checking word:', err);
-      setError('检查单词失败: ' + err.message);
-    } finally {
-      setIsChecking(false);
-    }
-  }, [word]);
-
   // 从 Free Dictionary API 获取英文释义
   const handleGetDefinitions = useCallback(async () => {
     if (!word.trim()) {
@@ -182,8 +192,8 @@ export function AddWord() {
 
   // 翻译中文释义
   const handleTranslateChinese = useCallback(async () => {
-    if (meanings.every(m => m.definitions.every(d => d.chineseDefinition))) {
-      setError('所有释义已有中文翻译');
+    if (meanings.length === 0 || meanings.every(m => m.definitions.every(d => d.chineseDefinition))) {
+      setError('没有需要翻译的释义');
       return;
     }
 
@@ -254,35 +264,40 @@ export function AddWord() {
     setUseBuiltinMeanings(false);
     setShowBuiltinCard(false);
     setModelMessage('请添加您的自定义释义');
-  }, []);
+    // 添加一个空的 meaning
+    if (meanings.length === 0) {
+      setMeanings([
+        {
+          partOfSpeech: 'noun',
+          definitions: [
+            {
+              definition: '',
+              example: '',
+              chineseDefinition: '',
+              synonyms: [],
+              antonyms: [],
+            },
+          ],
+          synonyms: [],
+          antonyms: [],
+        },
+      ]);
+    }
+  }, [meanings.length]);
 
   // 取消添加（单词已存在）
   const handleCancelAdd = useCallback(() => {
     setCheckResult(null);
     setWord('');
     setPhonetic('');
-    setMeanings([
-      {
-        partOfSpeech: 'noun',
-        definitions: [
-          {
-            definition: '',
-            example: '',
-            chineseDefinition: '',
-            synonyms: [],
-            antonyms: [],
-          },
-        ],
-        synonyms: [],
-        antonyms: [],
-      },
-    ]);
+    setMeanings([]);
     setModelMessage('');
+    setHasChecked(false);
   }, []);
 
   // 强制添加（单词已存在但用户仍要添加）
   const handleForceAdd = useCallback(() => {
-    setCheckResult(null);
+    setCheckResult(prev => prev ? { ...prev, existsInUserLibrary: false } : null);
     setModelMessage('您可以继续添加此单词（将创建新记录）');
   }, []);
 
@@ -294,13 +309,20 @@ export function AddWord() {
       return;
     }
 
-    if (meanings.every((meaning) => meaning.definitions.every((def: any) => !def.definition.trim()))) {
-      setError('Please enter at least one definition');
+    if (!user) {
+      setError('Please login first');
       return;
     }
 
-    if (!user) {
-      setError('Please login first');
+    // 如果还没有检查过，先执行检查
+    if (!hasChecked) {
+      await performCheck(word.trim());
+      return;
+    }
+
+    // 如果单词已存在且用户没有强制添加，显示警告
+    if (checkResult?.existsInUserLibrary) {
+      setModelMessage('该单词已存在，请选择操作');
       return;
     }
 
@@ -309,7 +331,7 @@ export function AddWord() {
       const newWord = await addWordWithCheck({
         word: word.trim(),
         phonetic: phonetic.trim(),
-        meanings: meanings,
+        meanings: meanings.length > 0 ? meanings : [],
         tags: parseTags(tags),
         userId: user.id,
         useBuiltinMeanings,
@@ -328,32 +350,18 @@ export function AddWord() {
       setWord('');
       setPhonetic('');
       setTags('');
-      setMeanings([
-        {
-          partOfSpeech: 'noun',
-          definitions: [
-            {
-              definition: '',
-              example: '',
-              chineseDefinition: '',
-              synonyms: [],
-              antonyms: [],
-            },
-          ],
-          synonyms: [],
-          antonyms: [],
-        },
-      ]);
+      setMeanings([]);
       setError('');
       setModelMessage('');
       setCheckResult(null);
       setShowBuiltinCard(false);
       setUseBuiltinMeanings(false);
+      setHasChecked(false);
     } catch (err) {
       setError('Failed to add word');
       setSuccessMessage('');
     }
-  }, [word, phonetic, tags, meanings, useBuiltinMeanings, checkResult]);
+  }, [word, phonetic, tags, meanings, useBuiltinMeanings, checkResult, hasChecked, user]);
 
   return (
     <div className="w-full max-w-4xl mx-auto">
@@ -372,6 +380,7 @@ export function AddWord() {
 
         {modelMessage && (
           <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-blue-600">
+            {isChecking && <span className="inline-block mr-2">⏳</span>}
             {modelMessage}
           </div>
         )}
@@ -412,26 +421,21 @@ export function AddWord() {
                 />
                 <button
                   type="button"
-                  onClick={handleCheckWord}
-                  disabled={isChecking || !word.trim()}
-                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  {isChecking ? 'Checking...' : 'Check Word'}
-                </button>
-                <button
-                  type="button"
                   onClick={handleGetDefinitions}
-                  disabled={isLoading}
+                  disabled={isLoading || !word.trim()}
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {isLoading ? 'Loading...' : 'Get Definitions'}
                 </button>
               </div>
+              {isChecking && (
+                <p className="mt-1 text-sm text-gray-500">正在检查单词...</p>
+              )}
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Phonetic
+                Phonetic <span className="text-gray-400 font-normal">(可选)</span>
               </label>
               <input
                 type="text"
@@ -444,7 +448,7 @@ export function AddWord() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Tags (comma separated)
+                Tags <span className="text-gray-400 font-normal">(可选，逗号分隔)</span>
               </label>
               <input
                 type="text"
@@ -460,7 +464,7 @@ export function AddWord() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-semibold text-gray-900">
-              Meanings
+              Meanings <span className="text-gray-400 font-normal text-sm">(可选)</span>
               {useBuiltinMeanings && (
                 <span className="ml-2 text-sm font-normal text-purple-600 bg-purple-50 px-2 py-1 rounded">
                   使用系统内置释义
@@ -471,7 +475,7 @@ export function AddWord() {
               <button
                 type="button"
                 onClick={handleTranslateChinese}
-                disabled={isTranslating}
+                disabled={isTranslating || meanings.length === 0}
                 className="px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm transition-colors"
               >
                 {isTranslating ? 'Translating...' : 'Translate to Chinese'}
@@ -486,159 +490,166 @@ export function AddWord() {
             </div>
           </div>
 
-          <div className="space-y-6">
-            {meanings.map((meaning, meaningIndex) => (
-              <div
-                key={meaningIndex}
-                className="border border-gray-200 rounded-lg p-4 space-y-4"
-              >
-                <div className="flex justify-between items-start">
-                  <div className="flex-1 mr-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Part of Speech
-                    </label>
-                    <input
-                      type="text"
-                      value={meaning.partOfSpeech}
-                      onChange={(e) =>
-                        setMeanings(
-                          meanings.map((m, i) =>
-                            i === meaningIndex
-                              ? { ...m, partOfSpeech: e.target.value }
-                              : m
-                          )
-                        )
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="noun, verb, adjective, etc."
-                    />
-                  </div>
-                  {meanings.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveMeaning(meaningIndex)}
-                      className="text-red-600 hover:text-red-700 text-sm"
-                    >
-                      Remove
-                    </button>
-                  )}
-                </div>
-
-                <div className="space-y-4">
-                  {meaning.definitions.map((def, defIndex: number) => (
-                    <div
-                      key={defIndex}
-                      className="bg-gray-50 rounded-lg p-4 space-y-3"
-                    >
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Definition
-                        </label>
-                        <textarea
-                          value={def.definition}
-                          onChange={(e) =>
-                            setMeanings(
-                              meanings.map((m, mi) =>
-                                mi === meaningIndex
-                                  ? {
-                                      ...m,
-                                      definitions: m.definitions.map((d, di: number) =>
-                                        di === defIndex
-                                          ? { ...d, definition: e.target.value }
-                                          : d
-                                      ),
-                                    }
-                                  : m
-                              )
-                            )
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          rows={2}
-                          placeholder="Enter definition"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Example
-                        </label>
-                        <textarea
-                          value={def.example}
-                          onChange={(e) =>
-                            setMeanings(
-                              meanings.map((m, mi) =>
-                                mi === meaningIndex
-                                  ? {
-                                      ...m,
-                                      definitions: m.definitions.map((d, di: number) =>
-                                        di === defIndex
-                                          ? { ...d, example: e.target.value }
-                                          : d
-                                      ),
-                                    }
-                                  : m
-                              )
-                            )
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          rows={2}
-                          placeholder="Enter example sentence"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Chinese Definition
-                        </label>
-                        <textarea
-                          value={def.chineseDefinition}
-                          onChange={(e) =>
-                            setMeanings(
-                              meanings.map((m, mi) =>
-                                mi === meaningIndex
-                                  ? {
-                                      ...m,
-                                      definitions: m.definitions.map((d, di: number) =>
-                                        di === defIndex
-                                          ? { ...d, chineseDefinition: e.target.value }
-                                          : d
-                                      ),
-                                    }
-                                  : m
-                              )
-                            )
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          rows={2}
-                          placeholder="输入中文释义"
-                        />
-                      </div>
-
-                      {meaning.definitions.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleRemoveDefinition(meaningIndex, defIndex)
-                          }
-                          className="text-red-600 hover:text-red-700 text-sm"
-                        >
-                          Remove Definition
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => handleAddDefinition(meaningIndex)}
-                  className="text-blue-600 hover:text-blue-700 text-sm"
+          {meanings.length === 0 ? (
+            <div className="text-center py-8 text-gray-400">
+              <p>暂无释义</p>
+              <p className="text-sm mt-1">点击 &quot;Add Meaning&quot; 添加，或直接提交空单词</p>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {meanings.map((meaning, meaningIndex) => (
+                <div
+                  key={meaningIndex}
+                  className="border border-gray-200 rounded-lg p-4 space-y-4"
                 >
-                  Add Definition
-                </button>
-              </div>
-            ))}
-          </div>
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1 mr-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Part of Speech
+                      </label>
+                      <input
+                        type="text"
+                        value={meaning.partOfSpeech}
+                        onChange={(e) =>
+                          setMeanings(
+                            meanings.map((m, i) =>
+                              i === meaningIndex
+                                ? { ...m, partOfSpeech: e.target.value }
+                                : m
+                            )
+                          )
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="noun, verb, adjective, etc."
+                      />
+                    </div>
+                    {meanings.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveMeaning(meaningIndex)}
+                        className="text-red-600 hover:text-red-700 text-sm"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="space-y-4">
+                    {meaning.definitions.map((def, defIndex: number) => (
+                      <div
+                        key={defIndex}
+                        className="bg-gray-50 rounded-lg p-4 space-y-3"
+                      >
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Definition
+                          </label>
+                          <textarea
+                            value={def.definition}
+                            onChange={(e) =>
+                              setMeanings(
+                                meanings.map((m, mi) =>
+                                  mi === meaningIndex
+                                    ? {
+                                        ...m,
+                                        definitions: m.definitions.map((d, di: number) =>
+                                          di === defIndex
+                                            ? { ...d, definition: e.target.value }
+                                            : d
+                                        ),
+                                      }
+                                    : m
+                                )
+                              )
+                            }
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            rows={2}
+                            placeholder="Enter definition"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Example
+                          </label>
+                          <textarea
+                            value={def.example}
+                            onChange={(e) =>
+                              setMeanings(
+                                meanings.map((m, mi) =>
+                                  mi === meaningIndex
+                                    ? {
+                                        ...m,
+                                        definitions: m.definitions.map((d, di: number) =>
+                                          di === defIndex
+                                            ? { ...d, example: e.target.value }
+                                            : d
+                                        ),
+                                      }
+                                    : m
+                                )
+                              )
+                            }
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            rows={2}
+                            placeholder="Enter example sentence"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Chinese Definition
+                          </label>
+                          <textarea
+                            value={def.chineseDefinition}
+                            onChange={(e) =>
+                              setMeanings(
+                                meanings.map((m, mi) =>
+                                  mi === meaningIndex
+                                    ? {
+                                        ...m,
+                                        definitions: m.definitions.map((d, di: number) =>
+                                          di === defIndex
+                                            ? { ...d, chineseDefinition: e.target.value }
+                                            : d
+                                        ),
+                                      }
+                                    : m
+                                )
+                              )
+                            }
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            rows={2}
+                            placeholder="输入中文释义"
+                          />
+                        </div>
+
+                        {meaning.definitions.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleRemoveDefinition(meaningIndex, defIndex)
+                            }
+                            className="text-red-600 hover:text-red-700 text-sm"
+                          >
+                            Remove Definition
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleAddDefinition(meaningIndex)}
+                    className="text-blue-600 hover:text-blue-700 text-sm"
+                  >
+                    Add Definition
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <button

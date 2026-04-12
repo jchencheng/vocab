@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '../services/supabase';
+import { randomUUID } from 'crypto';
 
 // 将驼峰式字段名转换为下划线式（用于写入数据库）
 function mapWordToDB(word: any) {
@@ -105,7 +106,7 @@ export async function POST(request: NextRequest) {
     // 准备单词数据
     const wordData = {
       ...word,
-      id: crypto.randomUUID(),
+      id: randomUUID(),
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
