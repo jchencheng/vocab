@@ -47,6 +47,32 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // 检查用户是否存在于 users 表，如果不存在则创建
+    const { data: existingUser, error: userCheckError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', userId)
+      .single();
+
+    if (!existingUser) {
+      // 用户不存在，创建新用户
+      const { error: createUserError } = await supabase
+        .from('users')
+        .insert({
+          id: userId,
+          email: `user-${userId}@placeholder.com`,
+          created_at: new Date().toISOString()
+        });
+
+      if (createUserError) {
+        console.error('Error creating user:', createUserError);
+        return NextResponse.json(
+          { error: 'Failed to create user record' },
+          { status: 500 }
+        );
+      }
+    }
+
     // 获取当前最大优先级
     const { data: maxPriorityData, error: maxPriorityError } = await supabase
       .from('user_learning_sequences')

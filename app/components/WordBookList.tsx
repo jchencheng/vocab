@@ -29,7 +29,7 @@ export function WordBookList() {
   const [isLoading, setIsLoading] = useState(true);
 
   const loadWordBooks = useCallback(async () => {
-    if (!user) return;
+    if (!user?.id) return;
     try {
       setIsLoading(true);
       const data = await fetchWordBooks(user.id);
@@ -58,11 +58,13 @@ export function WordBookList() {
     } finally {
       setIsLoading(false);
     }
-  }, [user]);
+  }, [user?.id]);
 
   useEffect(() => {
-    loadWordBooks();
-  }, [loadWordBooks]);
+    if (user?.id) {
+      loadWordBooks();
+    }
+  }, [user?.id, loadWordBooks]);
 
   const handleModeChange = useCallback(async (mode: StudyMode) => {
     await saveSettings({ ...settings, studyMode: mode });
