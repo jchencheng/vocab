@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
 import { WordBookCard } from './WordBookCard';
@@ -15,6 +16,7 @@ import {
 } from '../services/wordbookAPI';
 
 export function WordBookList() {
+  const router = useRouter();
   const { user } = useAuth();
   const { settings, saveSettings } = useApp();
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -126,17 +128,21 @@ export function WordBookList() {
   };
 
   // 获取学习序列中的单词书 ID 集合
-  const sequenceBookIds = new Set(learningSequence.map(item => item.word_book_id));
+  const sequenceBookIds = new Set(learningSequence.map(item => item.word_book_id || item.wordBookId));
 
   // 过滤出未添加的系统单词书
   const availableSystemBooks = systemBooks.filter(book => !sequenceBookIds.has(book.id));
 
   // 合并学习序列中的单词书（系统 + 自定义）
-  const sequenceBooks = learningSequence.map(item => ({
-    ...item.word_book,
-    sequenceId: item.id,
-    isPrimary: item.is_primary
-  }));
+  const sequenceBooks = learningSequence.map(item => {
+    // Supabase 返回下划线命名，转换为驼峰
+    const wordBook = item.word_book || item.wordBook;
+    return {
+      ...wordBook,
+      sequenceId: item.id,
+      isPrimary: item.is_primary || item.isPrimary
+    };
+  });
 
   if (isLoading) {
     return (
@@ -184,7 +190,7 @@ export function WordBookList() {
                 isPrimary={book.isPrimary}
                 onRemoveFromSequence={() => handleRemoveFromSequence(book.id)}
                 onSetPrimary={() => handleSetPrimary(book.id)}
-                onViewDetail={() => alert('详情功能开发中')}
+                onViewDetail={() => router.push(`/wordbooks/${book.id}`)}
               />
             ))}
           </div>

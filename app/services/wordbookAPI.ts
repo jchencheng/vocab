@@ -1,4 +1,4 @@
-import type { WordBook, CreateWordBookRequest, LearningSequenceItem, StudyMode } from '../types';
+import type { WordBook, CreateWordBookRequest, LearningSequenceItem, StudyMode, Word } from '../types';
 
 const API_BASE = '/api';
 
@@ -101,4 +101,18 @@ export async function resetWordBook(id: string, userId: string): Promise<void> {
     body: JSON.stringify({ userId })
   });
   if (!response.ok) throw new Error('Failed to reset wordbook');
+}
+
+// 获取单词书单词列表（分页）
+export async function fetchWordBookWords(
+  id: string,
+  userId: string,
+  page: number = 1,
+  pageSize: number = 20
+): Promise<{ words: Word[]; total: number }> {
+  const response = await fetch(
+    `${API_BASE}/wordbooks/${id}/words?userId=${userId}&page=${page}&pageSize=${pageSize}`
+  );
+  if (!response.ok) throw new Error('Failed to fetch wordbook words');
+  return response.json();
 }
