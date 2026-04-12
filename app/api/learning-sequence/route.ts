@@ -48,15 +48,17 @@ export async function POST(request: NextRequest) {
     }
 
     // 获取当前最大优先级
-    const { data: maxPriority } = await supabase
+    const { data: maxPriorityData, error: maxPriorityError } = await supabase
       .from('user_learning_sequences')
       .select('priority')
       .eq('user_id', userId)
       .order('priority', { ascending: false })
-      .limit(1)
-      .single();
+      .limit(1);
 
-    const priority = (maxPriority?.priority || 0) + 1;
+    // 如果没有数据或出错，默认优先级为 1
+    const priority = (maxPriorityData && maxPriorityData.length > 0) 
+      ? (maxPriorityData[0].priority || 0) + 1 
+      : 1;
 
     // 如果设为主学，取消其他的主学状态
     if (isPrimary) {
