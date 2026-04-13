@@ -1,22 +1,49 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
 import { WordDetailModal } from './WordDetailModal';
 import { Pagination } from './Pagination';
 import { calculateStats, filterWords, getAllTags, getIntervalText, getChineseDefinition } from '../utils/wordUtils';
+import { fetchDueTodayCount } from '../services/apiClient';
 import type { Word } from '../types';
 
 const ITEMS_PER_PAGE = 10;
 
 export function WordList() {
   const { words, isLoading, deleteWord } = useApp();
+  const { user } = useAuth();
   const [selectedWord, setSelectedWord] = useState<Word | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [dueTodayCount, setDueTodayCount] = useState<number>(0);
 
-  const stats = useMemo(() => calculateStats(words), [words]);
+  // 从服务器获取准确的 Due Today 数量
+  useEffect(() => {
+    if (!user?.id) return;
+    
+    const loadDueTodayCount = async () => {
+      try {
+        const count = await fetchDueTodayCount(user.id);
+        setDueTodayCount(count);
+      } catch (error) {
+        console.error('Error loading due today count:', error);
+      }
+    };
+    
+    loadDueTodayCount();
+  }, [user?.id, words]); // 当用户或单词列表变化时重新获取
+
+  const stats = useMemo(() => {
+    const baseStats = calculateStats(words);
+    // 使用服务器返回的准确 Due Today 数量
+    return {
+      ...baseStats,
+      dueToday: dueTodayCount,
+    };
+  }, [words, dueTodayCount]);
   const allTags = useMemo(() => getAllTags(words), [words]);
   const filteredWords = useMemo(
     () => filterWords(words, searchQuery, selectedTag),

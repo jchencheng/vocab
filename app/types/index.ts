@@ -89,3 +89,18 @@ export interface AddWordRequest {
   originalWordId?: string;
   force?: boolean;
 }
+
+// 每日复习进度
+export interface UserDailyProgress {
+  id: string;
+  userId: string;
+  reviewDate: string;  // YYYY-MM-DD
+  queueWordIds: string[];
+  currentIndex: number;
+  completedWordIds: string[];
+  postponedWordIds: string[];
+  maxDailyReviews: number;
+  isCompleted: boolean;
+  createdAt: number;
+  updatedAt: number;
+}

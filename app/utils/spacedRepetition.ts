@@ -106,6 +106,49 @@ export function getDueWordsByStudyMode(
   return dueWords;
 }
 
+/**
+ * 简单的 seeded random 函数
+ * 相同的种子会产生相同的随机数序列
+ */
+function seededRandom(seed: number): () => number {
+  let s = seed;
+  return () => {
+    s = Math.sin(s * 12.9898 + 78.233) * 43758.5453;
+    return s - Math.floor(s);
+  };
+}
+
+/**
+ * 将字符串转换为数字种子
+ */
+function stringToSeed(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return Math.abs(hash);
+}
+
+/**
+ * 使用种子打乱数组顺序
+ * 相同的种子和数组会产生相同的顺序
+ */
+export function shuffleWordsWithSeed(words: Word[], seed: string | number): Word[] {
+  const numSeed = typeof seed === 'string' ? stringToSeed(seed) : seed;
+  const random = seededRandom(numSeed);
+  const result = [...words];
+  
+  // Fisher-Yates shuffle with seeded random
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  
+  return result;
+}
+
 export function shuffleWords(words: Word[]): Word[] {
   return [...words].sort(() => Math.random() - 0.5);
 }

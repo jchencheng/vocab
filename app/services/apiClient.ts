@@ -1,4 +1,4 @@
-import type { Word, AIContext, AppSettings } from '../types';
+import type { Word, AIContext, AppSettings, UserDailyProgress } from '../types';
 
 const API_BASE_URL = '/api';
 
@@ -116,4 +116,46 @@ export interface WordForReview {
  */
 export async function fetchWordsForReview(userId: string, limit: number = 100): Promise<WordForReview[]> {
   return fetchAPI(`${API_BASE_URL}/words/review?userId=${userId}&limit=${limit}`);
+}
+
+/**
+ * 获取今天需要复习的单词数量
+ */
+export async function fetchDueTodayCount(userId: string): Promise<number> {
+  const response = await fetchAPI(`${API_BASE_URL}/words/review/count?userId=${userId}`);
+  return response.count || 0;
+}
+
+// ========== Daily Progress API ==========
+
+/**
+ * 获取用户指定日期的复习进度
+ */
+export async function fetchDailyProgress(userId: string, date?: string): Promise<UserDailyProgress | null> {
+  const dateParam = date ? `&date=${date}` : '';
+  return fetchAPI(`${API_BASE_URL}/daily-progress?userId=${userId}${dateParam}`);
+}
+
+/**
+ * 创建或更新每日复习进度
+ */
+export async function saveDailyProgress(progress: Partial<UserDailyProgress>): Promise<UserDailyProgress> {
+  return fetchAPI(`${API_BASE_URL}/daily-progress`, {
+    method: 'POST',
+    body: JSON.stringify(progress),
+  });
+}
+
+/**
+ * 更新每日复习进度（部分更新）
+ */
+export async function updateDailyProgress(
+  userId: string,
+  updates: Partial<Omit<UserDailyProgress, 'id' | 'userId' | 'reviewDate'>>,
+  date?: string
+): Promise<UserDailyProgress> {
+  return fetchAPI(`${API_BASE_URL}/daily-progress`, {
+    method: 'PUT',
+    body: JSON.stringify({ userId, reviewDate: date, ...updates }),
+  });
 }

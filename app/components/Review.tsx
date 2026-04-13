@@ -1,12 +1,11 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
-import { calculateNextReview, shuffleWords, limitWords, postponeToTomorrow, postponeWithPriority, getDueWords, getDueWordsByStudyMode } from '../utils/spacedRepetition';
+import { calculateNextReview, shuffleWordsWithSeed, limitWords, postponeToTomorrow, postponeWithPriority, getDueWords, getDueWordsByStudyMode } from '../utils/spacedRepetition';
 import { getIntervalText, getExampleSentence, getChineseDefinition, playAudio, hasAudio } from '../utils/wordUtils';
-import { fetchWordsForReview, WordForReview } from '../services/apiClient';
-import { QUALITY_LABELS } from '../constants';
+import { fetchWordsForReview, WordForReview, fetchDailyProgress, saveDailyProgress, updateDailyProgress } from '../services/apiClient';
 import type { Word } from '../types';
 
 type ReviewMode = 'en-to-cn' | 'cn-to-en';
@@ -17,18 +16,25 @@ const STUDY_MODE_LABELS: Record<string, string> = {
   'mixed': '全部混合'
 };
 
+// 获取今天的日期字符串 YYYY-MM-DD
+function getTodayString(): string {
+  return new Date().toISOString().split('T')[0];
+}
+
 export function Review() {
-  const { words, settings, updateWord, refreshWords, learningSequence, wordBooks } = useApp();
+  const { words, settings, updateWord, learningSequence } = useApp();
   const { user } = useAuth();
   const [queue, setQueue] = useState<Word[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showAnswer, setShowAnswer] = useState(false);
   const [mode, setMode] = useState<ReviewMode>('en-to-cn');
   const [isComplete, setIsComplete] = useState(false);
-  const [postponedCount, setPostponedCount] = useState(0);
-  const [isInitialized, setIsInitialized] = useState(false);
-  const [primaryBookWordIds, setPrimaryBookWordIds] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
+  const [primaryBookWordIds, setPrimaryBookWordIds] = useState<Set<string>>(new Set());
+  
+  // 使用 ref 来跟踪是否已经初始化
+  const isInitializedRef = useRef(false);
+  const isSavingRef = useRef(false);
 
   const maxDailyReviews = settings.maxDailyReviews || 50;
   const studyMode = settings.studyMode || 'mixed';
@@ -41,7 +47,6 @@ export function Review() {
       return;
     }
 
-    // 获取该单词书的所有单词ID
     const fetchPrimaryBookWords = async () => {
       try {
         const response = await fetch(`/api/wordbooks/${primaryWordBookId}/words?pageSize=10000`);
@@ -56,36 +61,39 @@ export function Review() {
     };
 
     fetchPrimaryBookWords();
-    // 只依赖 primaryWordBookId 和 studyMode，避免 wordBooks 变化导致循环
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [primaryWordBookId, studyMode]);
 
-  // 初始化复习队列（使用优化后的 API）
-  // 只在组件挂载时执行一次
+  // 初始化复习队列（使用确定性随机）
   useEffect(() => {
-    if (isInitialized || !user?.id) {
-      console.log('Review useEffect skipped - already initialized or no user');
+    if (isInitializedRef.current || !user?.id) {
       return;
     }
 
     const initReviewQueue = async () => {
-      console.log('Review initReviewQueue START (optimized)');
+      console.log('Review initReviewQueue START');
       setIsLoading(true);
+      isInitializedRef.current = true;
 
       try {
-        // 使用优化后的 API 获取复习单词
-        // 这个 API 使用单查询 JOIN，只返回轻量级数据
-        const reviewWords = await fetchWordsForReview(user.id, maxDailyReviews * 2); // 获取双倍数量，用于筛选
+        const today = getTodayString();
+        const seed = `${user.id}-${today}`; // 使用用户ID+日期作为种子
+        
+        // 1. 获取今天的复习进度（只读取 currentIndex）
+        const progress = await fetchDailyProgress(user.id, today);
+        const savedIndex = progress?.currentIndex || 0;
+        console.log('Saved progress index:', savedIndex);
 
-        console.log('Fetched review words (optimized):', reviewWords.length);
+        // 2. 获取待复习单词列表
+        const reviewWords = await fetchWordsForReview(user.id, maxDailyReviews * 2);
+        console.log('Fetched review words:', reviewWords.length);
 
-        // 转换为 Word 类型（兼容现有代码）
+        // 转换为 Word 类型
         const convertedWords: Word[] = reviewWords.map((rw: WordForReview) => ({
           id: rw.id,
           word: rw.word,
           phonetic: rw.phonetic,
-          phonetics: [], // 轻量级数据不包含 phonetics
-          meanings: [{ // 构造一个最小化的 meaning 结构
+          phonetics: [],
+          meanings: [{
             partOfSpeech: '',
             definitions: [{
               definition: '',
@@ -106,7 +114,7 @@ export function Review() {
           updatedAt: Date.now()
         }));
 
-        // 根据学习模式筛选（如果需要）
+        // 根据学习模式筛选
         let filteredWords = convertedWords;
         if (studyMode !== 'mixed' && primaryWordBookId && primaryBookWordIds.size > 0) {
           const primaryIds = primaryBookWordIds;
@@ -119,127 +127,161 @@ export function Review() {
           }
         }
 
-        // 打乱顺序并限制数量
-        const shuffled = shuffleWords(filteredWords);
+        // 3. 使用确定性随机打乱（相同的种子产生相同的顺序）
+        const shuffled = shuffleWordsWithSeed(filteredWords, seed);
         const limited = limitWords(shuffled, maxDailyReviews);
 
-        // 获取需要推迟的单词（这些单词已经由 API 筛选过，都是到期的）
-        const postponedWords = shuffled.slice(maxDailyReviews);
-
+        // 4. 恢复进度或从头开始
+        const startIndex = Math.min(savedIndex, limited.length);
+        
         setQueue(limited);
-        setCurrentIndex(0);
-        setShowAnswer(false);
-        setIsComplete(false);
-        setPostponedCount(postponedWords.length);
-        setIsInitialized(true);
-        console.log('Review initReviewQueue END - queue:', limited.length, 'postponed:', postponedWords.length);
+        setCurrentIndex(startIndex);
+        setIsComplete(startIndex >= limited.length);
+        
+        // 如果没有进度记录，创建一个
+        if (!progress) {
+          await saveDailyProgress({
+            userId: user.id,
+            reviewDate: today,
+            currentIndex: 0,
+            maxDailyReviews,
+          });
+        }
+        
+        console.log('Queue initialized - total:', limited.length, 'startIndex:', startIndex);
       } catch (error) {
         console.error('Error initializing review queue:', error);
-        // 出错时回退到旧方法
         fallbackInitReviewQueue();
       } finally {
         setIsLoading(false);
       }
     };
 
-    // 备用方案：使用旧的 words 数据
     const fallbackInitReviewQueue = () => {
       console.log('Using fallback init method');
       const dueWords = words.filter(w => w.nextReviewAt <= Date.now());
-      const shuffled = shuffleWords(dueWords);
+      const seed = `${user?.id || 'guest'}-${getTodayString()}`;
+      const shuffled = shuffleWordsWithSeed(dueWords, seed);
       const limited = limitWords(shuffled, maxDailyReviews);
       setQueue(limited);
-      setIsInitialized(true);
       setIsLoading(false);
     };
 
     initReviewQueue();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isInitialized, user?.id]); // 只在 isInitialized 或 user 变化时执行
+  }, [user?.id, primaryBookWordIds.size]);
+
+  // 保存当前索引到数据库
+  const saveProgress = useCallback(async (newIndex: number) => {
+    if (!user?.id || isSavingRef.current) return;
+    
+    isSavingRef.current = true;
+    try {
+      const today = getTodayString();
+      await updateDailyProgress(user.id, { currentIndex: newIndex }, today);
+      console.log('Progress saved, index:', newIndex);
+    } catch (error) {
+      console.error('Error saving progress:', error);
+    } finally {
+      isSavingRef.current = false;
+    }
+  }, [user?.id]);
 
   const currentWord = queue[currentIndex];
-  // 进度从0%开始，完成所有单词后达到100%
   const progress = queue.length > 0 ? (currentIndex / queue.length) * 100 : 0;
+  const remainingCount = queue.length - currentIndex;
 
   const handleShowAnswer = useCallback(() => {
     setShowAnswer(true);
   }, []);
 
   const handleRate = useCallback(async (quality: number) => {
-    if (!currentWord) return;
+    if (!currentWord || !user?.id) return;
 
     const updatedWord = calculateNextReview(currentWord, quality);
+    const isLastWord = currentIndex >= queue.length - 1;
+    const newIndex = isLastWord ? currentIndex : currentIndex + 1;
     
-    // 立即切换到下一个单词，不等待 API 响应
-    if (currentIndex < queue.length - 1) {
-      setCurrentIndex(prev => prev + 1);
-      setShowAnswer(false);
-    } else {
+    // 立即切换 UI
+    if (isLastWord) {
       setIsComplete(true);
+    } else {
+      setCurrentIndex(newIndex);
+      setShowAnswer(false);
     }
     
-    // 异步保存更新，不阻塞 UI
-    updateWord(updatedWord).catch(console.error);
-  }, [currentWord, currentIndex, queue.length, updateWord]);
+    // 异步保存进度和单词更新
+    Promise.all([
+      saveProgress(newIndex),
+      updateWord(updatedWord),
+    ]).catch(console.error);
+  }, [currentWord, currentIndex, queue.length, saveProgress, updateWord]);
 
   const handlePostpone = useCallback(async () => {
-    if (!currentWord) return;
+    if (!currentWord || !user?.id) return;
 
     const updatedWord = postponeToTomorrow(currentWord);
-    setPostponedCount(prev => prev + 1);
+    const isLastWord = currentIndex >= queue.length - 1;
+    const newIndex = isLastWord ? currentIndex : currentIndex + 1;
 
-    // 立即切换到下一个单词，不等待 API 响应
-    if (currentIndex < queue.length - 1) {
-      setCurrentIndex(prev => prev + 1);
-      setShowAnswer(false);
-    } else {
+    // 立即切换 UI
+    if (isLastWord) {
       setIsComplete(true);
+    } else {
+      setCurrentIndex(newIndex);
+      setShowAnswer(false);
     }
     
-    // 异步保存更新，不阻塞 UI
-    updateWord(updatedWord).catch(console.error);
-  }, [currentWord, currentIndex, queue.length, updateWord]);
+    // 异步保存进度和单词更新
+    Promise.all([
+      saveProgress(newIndex),
+      updateWord(updatedWord),
+    ]).catch(console.error);
+  }, [currentWord, currentIndex, queue.length, saveProgress, updateWord]);
 
   const handleRestart = useCallback(async () => {
-    // 重置初始化状态，强制重新加载队列
-    setIsInitialized(false);
+    if (!user?.id) return;
     
-    // 根据学习模式获取待复习单词
+    const today = getTodayString();
+    const seed = `${user.id}-${today}`;
+    
+    // 获取待复习单词
     let dueWords: Word[];
     
     if (studyMode === 'mixed' || !primaryWordBookId || primaryBookWordIds.size === 0) {
-      // 混合模式或没有主学单词书，使用所有单词
       dueWords = getDueWords(words);
     } else {
-      // 根据学习模式筛选
       dueWords = getDueWordsByStudyMode(words, studyMode, primaryWordBookId, 
         Array.from(primaryBookWordIds).map(id => ({ word_id: id, word_book_id: primaryWordBookId }))
       );
     }
     
-    // 打乱顺序并限制数量
-    const shuffled = shuffleWords(dueWords);
+    const shuffled = shuffleWordsWithSeed(dueWords, seed);
     const limited = limitWords(shuffled, maxDailyReviews);
-    
-    // 获取需要推迟的单词
     const postponedWords = shuffled.slice(maxDailyReviews);
     
-    // 如果有需要推迟的单词，自动推迟它们
+    // 推迟多余的单词
     if (postponedWords.length > 0) {
       const postponed = postponeWithPriority(postponedWords);
-      // 批量更新推迟的单词
       for (const word of postponed) {
         await updateWord(word);
       }
     }
     
+    // 重置进度
+    await saveDailyProgress({
+      userId: user.id,
+      reviewDate: today,
+      currentIndex: 0,
+      maxDailyReviews,
+    });
+    
     setQueue(limited);
     setCurrentIndex(0);
     setShowAnswer(false);
     setIsComplete(false);
-    setPostponedCount(postponedWords.length);
-    setIsInitialized(true);
-  }, [words, maxDailyReviews, updateWord, studyMode, primaryWordBookId, primaryBookWordIds]);
+    
+    console.log('Review restarted - queue:', limited.length);
+  }, [user?.id, words, maxDailyReviews, studyMode, primaryWordBookId, primaryBookWordIds, updateWord]);
 
   // 加载中状态
   if (isLoading) {
@@ -297,13 +339,8 @@ export function Review() {
             Review Complete!
           </h2>
           <p className="text-slate-600 dark:text-slate-400 mb-2 text-lg">
-            You reviewed {queue.length} words today.
+            You reviewed {currentIndex} of {queue.length} words today.
           </p>
-          {postponedCount > 0 && (
-            <p className="text-amber-600 dark:text-amber-400 mb-8 text-lg font-medium">
-              {postponedCount} word{postponedCount > 1 ? 's' : ''} postponed to tomorrow
-            </p>
-          )}
           <button
             onClick={handleRestart}
             className="px-8 py-4 bg-gradient-to-r from-primary-600 to-accent-600 text-white rounded-2xl font-semibold hover:opacity-90 transition-all shadow-soft hover:shadow-medium active:scale-[0.98]"
@@ -323,7 +360,7 @@ export function Review() {
       <div className="mb-8">
         <div className="flex items-center justify-between mb-3">
           <span className="text-sm font-semibold text-slate-600 dark:text-slate-400">
-            {currentIndex + 1} / {queue.length}
+            {currentIndex + 1} / {queue.length} ({remainingCount} remaining)
           </span>
           <span className="text-sm font-semibold text-slate-600 dark:text-slate-400">
             {Math.round(progress)}%
