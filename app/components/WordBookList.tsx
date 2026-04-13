@@ -61,6 +61,7 @@ export function WordBookList() {
   }, [user?.id]);
 
   useEffect(() => {
+    console.log('WordBookList useEffect triggered, user?.id:', user?.id);
     if (user?.id) {
       loadWordBooks();
     }
