@@ -105,7 +105,8 @@ export function Review() {
     };
     
     initReviewQueue();
-  }, [words, maxDailyReviews, updateWord, isInitialized, studyMode, primaryWordBookId, primaryBookWordIds]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isInitialized]); // 只在 isInitialized 变化时执行，避免 words/updateWord 变化导致重新初始化
 
   const currentWord = queue[currentIndex];
   // 进度从0%开始，完成所有单词后达到100%
