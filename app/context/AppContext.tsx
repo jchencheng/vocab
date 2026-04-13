@@ -90,7 +90,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [user?.id]);
 
   const addWord = useCallback(async (word: Word) => {
-    if (!user) return;
+    if (!user?.id) return;
     try {
       await addWordAPI(word, user.id);
       await refreshWords();
@@ -98,10 +98,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       console.error('Error adding word:', error);
       throw error;
     }
-  }, [user, refreshWords]);
+  }, [user?.id, refreshWords]);
 
   const updateWord = useCallback(async (word: Word) => {
-    if (!user) return;
+    if (!user?.id) return;
     try {
       await updateWordAPI(word, user.id);
       await refreshWords();
@@ -109,10 +109,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       console.error('Error updating word:', error);
       throw error;
     }
-  }, [user, refreshWords]);
+  }, [user?.id, refreshWords]);
 
   const deleteWord = useCallback(async (id: string) => {
-    if (!user) return;
+    if (!user?.id) return;
     try {
       await deleteWordAPI(id, user.id);
       await refreshWords();
@@ -120,10 +120,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       console.error('Error deleting word:', error);
       throw error;
     }
-  }, [user, refreshWords]);
+  }, [user?.id, refreshWords]);
 
   const addContext = useCallback(async (context: AIContext) => {
-    if (!user) return;
+    if (!user?.id) return;
     try {
       await addContextAPI(context, user.id);
       await refreshContexts();
@@ -131,10 +131,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       console.error('Error adding context:', error);
       throw error;
     }
-  }, [user, refreshContexts]);
+  }, [user?.id, refreshContexts]);
 
   const updateContext = useCallback(async (context: AIContext) => {
-    if (!user) return;
+    if (!user?.id) return;
     try {
       await updateContextAPI(context, user.id);
       await refreshContexts();
@@ -142,10 +142,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       console.error('Error updating context:', error);
       throw error;
     }
-  }, [user, refreshContexts]);
+  }, [user?.id, refreshContexts]);
 
   const deleteContext = useCallback(async (id: string) => {
-    if (!user) return;
+    if (!user?.id) return;
     try {
       await deleteContextAPI(id, user.id);
       await refreshContexts();
@@ -153,7 +153,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       console.error('Error deleting context:', error);
       throw error;
     }
-  }, [user, refreshContexts]);
+  }, [user?.id, refreshContexts]);
 
   const saveSettings = useCallback(async (newSettings: AppSettings) => {
     if (!user?.id) return;
