@@ -177,21 +177,28 @@ export function Review() {
     initReviewQueue();
   }, [user?.id, isPrimaryBookLoaded]); // 只在用户和主单词书加载完成后执行
 
-  // 保存当前索引到数据库
+  // 保存当前索引到数据库（使用 upsert 确保记录存在）
   const saveProgress = useCallback(async (newIndex: number) => {
     if (!user?.id || isSavingRef.current) return;
     
     isSavingRef.current = true;
     try {
       const today = getTodayString();
-      await updateDailyProgress(user.id, { currentIndex: newIndex }, today);
+      // 使用 saveDailyProgress (upsert) 而不是 updateDailyProgress (update)
+      // 这样可以确保即使记录不存在也能保存成功
+      await saveDailyProgress({
+        userId: user.id,
+        reviewDate: today,
+        currentIndex: newIndex,
+        maxDailyReviews,
+      });
       console.log('Progress saved, index:', newIndex);
     } catch (error) {
       console.error('Error saving progress:', error);
     } finally {
       isSavingRef.current = false;
     }
-  }, [user?.id]);
+  }, [user?.id, maxDailyReviews]);
 
   const currentWord = queue[currentIndex];
   const progress = queue.length > 0 ? (currentIndex / queue.length) * 100 : 0;
