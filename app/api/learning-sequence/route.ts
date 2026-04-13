@@ -93,54 +93,87 @@ export async function POST(request: NextRequest) {
 
     // 为单词书中的每个单词创建用户进度记录
     try {
-      // 1. 获取单词书中的所有单词ID
-      const { data: bookItems, error: itemsError } = await supabase
-        .from('word_book_items')
-        .select('word_id')
-        .eq('word_book_id', wordBookId);
-
-      if (itemsError) {
-        console.error('Error fetching wordbook items:', itemsError);
-      } else if (bookItems && bookItems.length > 0) {
-        const wordIds = bookItems.map(item => item.word_id);
-
-        // 2. 检查用户已有哪些单词的进度记录
-        const { data: existingProgress, error: progressError } = await supabase
-          .from('user_word_progress')
+      // 1. 获取单词书中的所有单词ID（分批获取，避免Supabase限制）
+      let allBookItems: any[] = [];
+      let page = 0;
+      const pageSize = 1000;
+      
+      while (true) {
+        const { data: bookItems, error: itemsError } = await supabase
+          .from('word_book_items')
           .select('word_id')
-          .eq('user_id', userId)
-          .in('word_id', wordIds);
+          .eq('word_book_id', wordBookId)
+          .range(page * pageSize, (page + 1) * pageSize - 1);
 
-        if (progressError) {
-          console.error('Error fetching existing progress:', progressError);
-        } else {
-          const existingWordIds = new Set(existingProgress?.map(p => p.word_id) || []);
+        if (itemsError) {
+          console.error('Error fetching wordbook items:', itemsError);
+          break;
+        }
+        
+        if (!bookItems || bookItems.length === 0) {
+          break;
+        }
+        
+        allBookItems = allBookItems.concat(bookItems);
+        
+        if (bookItems.length < pageSize) {
+          break;
+        }
+        page++;
+      }
 
-          // 3. 过滤出需要创建进度记录的单词
-          const newProgressRecords = wordIds
-            .filter(wordId => !existingWordIds.has(wordId))
-            .map(wordId => ({
-              user_id: userId,
-              word_id: wordId,
-              interval: 0,
-              review_count: 0,
-              ease_factor: 2.5,
-              next_review_at: Date.now(), // 新单词立即可复习
-              quality: 0
-            }));
+      console.log(`Found ${allBookItems.length} words in wordbook ${wordBookId}`);
 
-          // 4. 批量插入进度记录
-          if (newProgressRecords.length > 0) {
+      if (allBookItems.length > 0) {
+        const wordIds = allBookItems.map(item => item.word_id);
+
+        // 2. 检查用户已有哪些单词的进度记录（分批查询）
+        const existingWordIds = new Set<string>();
+        for (let i = 0; i < wordIds.length; i += 1000) {
+          const batch = wordIds.slice(i, i + 1000);
+          const { data: existingProgress, error: progressError } = await supabase
+            .from('user_word_progress')
+            .select('word_id')
+            .eq('user_id', userId)
+            .in('word_id', batch);
+
+          if (progressError) {
+            console.error('Error fetching existing progress:', progressError);
+          } else {
+            existingProgress?.forEach(p => existingWordIds.add(p.word_id));
+          }
+        }
+
+        // 3. 过滤出需要创建进度记录的单词
+        const newProgressRecords = wordIds
+          .filter(wordId => !existingWordIds.has(wordId))
+          .map(wordId => ({
+            user_id: userId,
+            word_id: wordId,
+            interval: 0,
+            review_count: 0,
+            ease_factor: 2.5,
+            next_review_at: Date.now(), // 新单词立即可复习
+            quality: 0
+          }));
+
+        console.log(`Creating ${newProgressRecords.length} new progress records for user ${userId}`);
+
+        // 4. 批量插入进度记录（分批插入，每批1000个）
+        if (newProgressRecords.length > 0) {
+          for (let i = 0; i < newProgressRecords.length; i += 1000) {
+            const batch = newProgressRecords.slice(i, i + 1000);
             const { error: insertError } = await supabase
               .from('user_word_progress')
-              .insert(newProgressRecords);
+              .insert(batch);
 
             if (insertError) {
-              console.error('Error inserting word progress:', insertError);
+              console.error(`Error inserting word progress batch ${i/1000 + 1}:`, insertError);
             } else {
-              console.log(`Created ${newProgressRecords.length} progress records for user ${userId}`);
+              console.log(`Inserted batch ${i/1000 + 1} (${batch.length} records)`);
             }
           }
+          console.log(`Total progress records created for user ${userId}: ${newProgressRecords.length}`);
         }
       }
     } catch (progressError) {

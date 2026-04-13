@@ -83,30 +83,56 @@ export async function GET(request: NextRequest) {
     if (learningSequences && learningSequences.length > 0) {
       const wordBookIds = learningSequences.map(seq => seq.word_book_id);
       
-      // 获取这些单词书中的所有单词
-      const { data: bookItems, error: itemsError } = await supabase
-        .from('word_book_items')
-        .select(`
-          word_id,
-          word:words(*)
-        `)
-        .in('word_book_id', wordBookIds);
+      // 获取这些单词书中的所有单词（分批获取）
+      let allBookItems: any[] = [];
+      for (const bookId of wordBookIds) {
+        let page = 0;
+        const pageSize = 1000;
+        
+        while (true) {
+          const { data: bookItems, error: itemsError } = await supabase
+            .from('word_book_items')
+            .select(`
+              word_id,
+              word:words(*)
+            `)
+            .eq('word_book_id', bookId)
+            .range(page * pageSize, (page + 1) * pageSize - 1);
 
-      if (itemsError) {
-        console.error('Error fetching wordbook items:', itemsError);
-      } else if (bookItems) {
-        const wordIds = bookItems.map((item: any) => item.word_id).filter(Boolean);
-        wordbookWords = bookItems
+          if (itemsError) {
+            console.error('Error fetching wordbook items:', itemsError);
+            break;
+          }
+          
+          if (!bookItems || bookItems.length === 0) {
+            break;
+          }
+          
+          allBookItems = allBookItems.concat(bookItems);
+          
+          if (bookItems.length < pageSize) {
+            break;
+          }
+          page++;
+        }
+      }
+
+      console.log(`Fetched ${allBookItems.length} words from learning sequences`);
+
+      if (allBookItems.length > 0) {
+        const wordIds = allBookItems.map((item: any) => item.word_id).filter(Boolean);
+        wordbookWords = allBookItems
           .map((item: any) => item.word)
           .filter((word: any) => word !== null);
 
-        // 获取这些单词的用户进度记录
-        if (wordIds.length > 0) {
+        // 获取这些单词的用户进度记录（分批查询）
+        for (let i = 0; i < wordIds.length; i += 1000) {
+          const batch = wordIds.slice(i, i + 1000);
           const { data: progressData, error: progressError } = await supabase
             .from('user_word_progress')
             .select('*')
             .eq('user_id', userId)
-            .in('word_id', wordIds);
+            .in('word_id', batch);
 
           if (progressError) {
             console.error('Error fetching word progress:', progressError);
@@ -117,6 +143,8 @@ export async function GET(request: NextRequest) {
             });
           }
         }
+        
+        console.log(`Fetched ${wordbookProgress.size} progress records for user ${userId}`);
       }
     }
 
