@@ -127,53 +127,44 @@ export async function POST(request: NextRequest) {
       if (allBookItems.length > 0) {
         const wordIds = allBookItems.map(item => item.word_id);
 
-        // 2. 检查用户已有哪些单词的进度记录（分批查询）
-        const existingWordIds = new Set<string>();
-        for (let i = 0; i < wordIds.length; i += 1000) {
-          const batch = wordIds.slice(i, i + 1000);
-          const { data: existingProgress, error: progressError } = await supabase
-            .from('user_word_progress')
-            .select('word_id')
-            .eq('user_id', userId)
-            .in('word_id', batch);
+        // 2. 检查用户已有哪些单词的进度记录
+        // 使用 upsert 避免重复键问题，不需要预先查询
+        console.log(`Preparing ${wordIds.length} progress records for user ${userId}`);
 
-          if (progressError) {
-            console.error('Error fetching existing progress:', progressError);
-          } else {
-            existingProgress?.forEach(p => existingWordIds.add(p.word_id));
-          }
-        }
+        // 3. 准备所有进度记录（使用 upsert 会自动跳过已存在的）
+        const progressRecords = wordIds.map(wordId => ({
+          user_id: userId,
+          word_id: wordId,
+          interval: 0,
+          review_count: 0,
+          ease_factor: 2.5,
+          next_review_at: Date.now(), // 新单词立即可复习
+          quality: 0
+        }));
 
-        // 3. 过滤出需要创建进度记录的单词
-        const newProgressRecords = wordIds
-          .filter(wordId => !existingWordIds.has(wordId))
-          .map(wordId => ({
-            user_id: userId,
-            word_id: wordId,
-            interval: 0,
-            review_count: 0,
-            ease_factor: 2.5,
-            next_review_at: Date.now(), // 新单词立即可复习
-            quality: 0
-          }));
-
-        console.log(`Creating ${newProgressRecords.length} new progress records for user ${userId}`);
-
-        // 4. 批量插入进度记录（分批插入，每批1000个）
-        if (newProgressRecords.length > 0) {
-          for (let i = 0; i < newProgressRecords.length; i += 1000) {
-            const batch = newProgressRecords.slice(i, i + 1000);
-            const { error: insertError } = await supabase
+        // 4. 批量 upsert 进度记录（分批处理，每批1000个）
+        let successCount = 0;
+        let errorCount = 0;
+        
+        if (progressRecords.length > 0) {
+          for (let i = 0; i < progressRecords.length; i += 1000) {
+            const batch = progressRecords.slice(i, i + 1000);
+            const { error: upsertError } = await supabase
               .from('user_word_progress')
-              .insert(batch);
+              .upsert(batch, {
+                onConflict: 'user_id,word_id',
+                ignoreDuplicates: true // 忽略重复键，不更新已有记录
+              });
 
-            if (insertError) {
-              console.error(`Error inserting word progress batch ${i/1000 + 1}:`, insertError);
+            if (upsertError) {
+              console.error(`Error upserting word progress batch ${i/1000 + 1}:`, upsertError);
+              errorCount += batch.length;
             } else {
-              console.log(`Inserted batch ${i/1000 + 1} (${batch.length} records)`);
+              successCount += batch.length;
+              console.log(`Upserted batch ${i/1000 + 1} (${batch.length} records)`);
             }
           }
-          console.log(`Total progress records created for user ${userId}: ${newProgressRecords.length}`);
+          console.log(`Total: ${successCount} progress records processed, ${errorCount} errors for user ${userId}`);
         }
       }
     } catch (progressError) {
