@@ -3,14 +3,14 @@ export interface Word {
   word: string;
   phonetic?: string;
   phonetics: any[];
-  
+
   // 内置释义（来自系统预置单词书，只读）
   builtInMeanings?: Meaning[];
-  
+
   // 用户释义（可编辑）- 等同于 meanings
   userMeanings?: Meaning[];
   meanings: Meaning[];
-  
+
   tags: string[];
   customNote?: string;
   interval: number;
@@ -20,12 +20,18 @@ export interface Word {
   createdAt: number;
   updatedAt: number;
   quality: number;
-  
+
   // 来源标记
   source?: 'builtin' | 'user' | 'hybrid';
-  
+
+  // 词典来源标记
+  sourceType?: 'dictionary' | 'custom';
+
   // 如果是从系统单词创建的，记录原始单词ID
   originalWordId?: string;
+
+  // 词典单词ID
+  sourceWordId?: string;
 }
 
 export interface AIContext {

@@ -22,6 +22,9 @@ export function WordDetailModal({ word, onClose, onDelete }: WordDetailModalProp
   const [error, setError] = useState('');
   const [modelMessage, setModelMessage] = useState('');
 
+  // 判断单词是否来自词典
+  const isFromDictionary = word.sourceType === 'dictionary';
+
   const editor = useWordEditor({ initialWord: word });
 
   const handlePlayAudio = useCallback(() => {
@@ -141,9 +144,12 @@ export function WordDetailModal({ word, onClose, onDelete }: WordDetailModalProp
           <div className="flex items-start justify-between mb-8">
             <div className="flex-1 min-w-0">
               {isEditing ? (
-                <div className="space-y-4">
+                <div className="space-y-5">
+                  {/* 单词输入 */}
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Word</label>
+                    <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                      单词 <span className="text-red-500">*</span>
+                    </label>
                     <input
                       type="text"
                       value={editor.editWord}
@@ -151,72 +157,129 @@ export function WordDetailModal({ word, onClose, onDelete }: WordDetailModalProp
                       className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 dark:text-white rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
                     />
                   </div>
+
+                  {/* 音标输入 */}
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Phonetic</label>
+                    <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                      音标
+                      {isFromDictionary && (
+                        <span className="ml-2 text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded">词典音标</span>
+                      )}
+                      {!isFromDictionary && <span className="text-slate-400 font-normal">(可选)</span>}
+                    </label>
                     <input
                       type="text"
                       value={editor.editPhonetic}
-                      onChange={(e) => editor.setEditPhonetic(e.target.value)}
-                      className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 dark:text-white rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                      onChange={(e) => !isFromDictionary && editor.setEditPhonetic(e.target.value)}
+                      disabled={isFromDictionary}
+                      className={`w-full px-4 py-3 border rounded-2xl transition-all ${
+                        isFromDictionary
+                          ? 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 cursor-not-allowed'
+                          : 'bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent'
+                      }`}
+                      placeholder="/fəˈnetɪk/"
                     />
                   </div>
+
+                  {/* 标签输入 */}
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Tags</label>
+                    <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                      标签 <span className="text-slate-400 font-normal">(可选，逗号分隔)</span>
+                    </label>
                     <input
                       type="text"
                       value={editor.editTags}
                       onChange={(e) => editor.setEditTags(e.target.value)}
                       className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 dark:text-white rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                      placeholder="例如：noun, verb, CET-4"
                     />
                   </div>
+
+                  {/* 错误提示 */}
                   {error && (
-                    <div className="mt-3 p-3 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800/50 rounded-2xl text-rose-600 dark:text-rose-400 text-sm flex items-center gap-2">
-                      <span>⚠️</span>
-                      {error}
+                    <div className="p-4 bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 rounded-r-lg text-red-700 dark:text-red-400 shadow-sm">
+                      <div className="flex items-center">
+                        <svg className="w-5 h-5 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                        </svg>
+                        <span className="font-medium">{error}</span>
+                      </div>
                     </div>
                   )}
+
+                  {/* 成功提示 */}
                   {modelMessage && (
-                    <div className="mt-3 p-3 bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800/50 rounded-2xl text-primary-600 dark:text-primary-400 text-sm flex items-center gap-2">
-                      <span>✅</span>
-                      {modelMessage}
+                    <div className="p-4 bg-green-50 dark:bg-green-900/20 border-l-4 border-green-500 rounded-r-lg text-green-700 dark:text-green-400 shadow-sm">
+                      <div className="flex items-center">
+                        <svg className="w-5 h-5 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        <span className="font-medium">{modelMessage}</span>
+                      </div>
                     </div>
                   )}
-                  <div className="flex gap-2">
-                    <button
-                      onClick={handleGetDefinitions}
-                      disabled={!editor.editWord.trim() || isLoadingDefinition}
-                      className="flex-1 px-4 py-3 bg-gradient-to-r from-primary-600 to-accent-600 text-white rounded-2xl font-semibold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-soft flex items-center justify-center gap-2"
-                    >
-                      {isLoadingDefinition ? (
-                        <>
-                          <span className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full" />
-                          Getting definitions...
-                        </>
-                      ) : (
-                        <>
-                          <span>🔍</span>
-                          Get Definitions
-                        </>
-                      )}
-                    </button>
-                    <button
-                      onClick={handleTranslateChinese}
-                      disabled={isTranslating}
-                      className="px-4 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-2xl font-semibold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-soft flex items-center justify-center gap-2"
-                    >
-                      {isTranslating ? (
-                        <>
-                          <span className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full" />
-                          Translating...
-                        </>
-                      ) : (
-                        <>
-                          <span>🌐</span>
-                          Translate
-                        </>
-                      )}
-                    </button>
-                  </div>
+
+                  {/* 词典词提示 */}
+                  {isFromDictionary && (
+                    <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500 rounded-r-lg text-blue-800 dark:text-blue-400 shadow-sm">
+                      <div className="flex items-center">
+                        <svg className="w-5 h-5 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                        </svg>
+                        <span className="font-medium">该单词来自词典，音标和释义不可编辑</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 操作按钮 */}
+                  {!isFromDictionary && (
+                    <div className="flex gap-3">
+                      <button
+                        onClick={handleGetDefinitions}
+                        disabled={!editor.editWord.trim() || isLoadingDefinition}
+                        className="flex-1 px-4 py-3 bg-gradient-to-r from-primary-600 to-accent-600 text-white rounded-2xl font-semibold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-soft flex items-center justify-center gap-2"
+                      >
+                        {isLoadingDefinition ? (
+                          <>
+                            <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            获取中...
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                            获取释义
+                          </>
+                        )}
+                      </button>
+                      <button
+                        onClick={handleTranslateChinese}
+                        disabled={isTranslating}
+                        className="px-4 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-2xl font-semibold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-soft flex items-center justify-center gap-2"
+                      >
+                        {isTranslating ? (
+                          <>
+                            <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            翻译中...
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+                            </svg>
+                            翻译中文
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div>
@@ -268,48 +331,85 @@ export function WordDetailModal({ word, onClose, onDelete }: WordDetailModalProp
           <div className="space-y-4 mb-8">
             {isEditing ? (
               <div>
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Meanings</h3>
+                <div className="flex items-center mb-4">
+                  <div className="w-1 h-5 bg-gradient-to-b from-green-500 to-green-600 rounded-full mr-3"></div>
+                  <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                    释义
+                    {isFromDictionary && (
+                      <span className="ml-2 text-sm font-medium text-blue-700 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30 px-2.5 py-1 rounded-full">
+                        词典释义
+                      </span>
+                    )}
+                  </h3>
+                </div>
                 {editor.editMeanings.map((meaning, idx) => (
-                  <div key={idx} className="bg-slate-50 dark:bg-slate-700/50 rounded-2xl p-5 mb-4 border border-slate-200/50 dark:border-slate-600/50">
+                  <div key={idx} className={`rounded-2xl p-5 mb-4 border ${isFromDictionary ? 'bg-blue-50/30 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' : 'bg-slate-50 dark:bg-slate-700/50 border-slate-200/50 dark:border-slate-600/50'}`}>
+                    <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                      词性
+                    </label>
                     <input
                       type="text"
                       value={meaning.partOfSpeech}
-                      onChange={(e) => editor.updateMeaning(idx, 'partOfSpeech', e.target.value)}
-                      className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 dark:text-white rounded-xl mb-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                      onChange={(e) => !isFromDictionary && editor.updateMeaning(idx, 'partOfSpeech', e.target.value)}
+                      disabled={isFromDictionary}
+                      className={`w-full px-4 py-2.5 border rounded-xl mb-4 text-sm transition-all ${
+                        isFromDictionary
+                          ? 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 cursor-not-allowed'
+                          : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent'
+                      }`}
+                      placeholder="如：名词、动词、形容词"
                     />
                     {meaning.definitions.map((def, defIdx) => (
-                      <div key={defIdx} className="mb-4">
+                      <div key={defIdx} className={`rounded-xl p-4 mb-4 ${isFromDictionary ? 'bg-blue-50/50 dark:bg-blue-900/30' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600'}`}>
                         <div className="mb-3">
-                          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
-                            English Definition
+                          <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                            英文释义
                           </label>
                           <textarea
                             value={def.definition}
-                            onChange={(e) => editor.updateDefinition(idx, defIdx, 'definition', e.target.value)}
-                            className="w-full px-3 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 dark:text-white rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all resize-none"
+                            onChange={(e) => !isFromDictionary && editor.updateDefinition(idx, defIdx, 'definition', e.target.value)}
+                            disabled={isFromDictionary}
+                            className={`w-full px-3 py-2.5 border rounded-xl text-sm transition-all resize-none ${
+                              isFromDictionary
+                                ? 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 cursor-not-allowed'
+                                : 'bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-600 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent'
+                            }`}
                             rows={2}
+                            placeholder="输入英文释义"
                           />
                         </div>
                         <div className="mb-3">
-                          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
-                            Chinese Definition
+                          <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                            中文释义
                           </label>
-                          <input
-                            type="text"
+                          <textarea
                             value={def.chineseDefinition || ''}
-                            onChange={(e) => editor.updateDefinition(idx, defIdx, 'chineseDefinition', e.target.value)}
-                            className="w-full px-3 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 dark:text-white rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                            onChange={(e) => !isFromDictionary && editor.updateDefinition(idx, defIdx, 'chineseDefinition', e.target.value)}
+                            disabled={isFromDictionary}
+                            className={`w-full px-3 py-2.5 border rounded-xl text-sm transition-all ${
+                              isFromDictionary
+                                ? 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 cursor-not-allowed'
+                                : 'bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-600 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent'
+                            }`}
+                            rows={2}
+                            placeholder="输入中文释义"
                           />
                         </div>
                         <div className="mb-3">
-                          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
-                            Example
+                          <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                            例句 <span className="text-slate-400 font-normal font-medium">(可选)</span>
                           </label>
-                          <input
-                            type="text"
+                          <textarea
                             value={def.example || ''}
-                            onChange={(e) => editor.updateDefinition(idx, defIdx, 'example', e.target.value)}
-                            className="w-full px-3 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 dark:text-white rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                            onChange={(e) => !isFromDictionary && editor.updateDefinition(idx, defIdx, 'example', e.target.value)}
+                            disabled={isFromDictionary}
+                            className={`w-full px-3 py-2.5 border rounded-xl text-sm transition-all ${
+                              isFromDictionary
+                                ? 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 cursor-not-allowed'
+                                : 'bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-600 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent'
+                            }`}
+                            rows={2}
+                            placeholder="输入例句"
                           />
                         </div>
                       </div>
@@ -345,19 +445,19 @@ export function WordDetailModal({ word, onClose, onDelete }: WordDetailModalProp
             {isEditing ? (
               <>
                 <button onClick={handleCancelEdit} className="flex-1 px-6 py-4 border-2 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-2xl font-semibold hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-all shadow-soft">
-                  Cancel
+                  取消
                 </button>
                 <button onClick={handleSave} className="flex-1 px-6 py-4 bg-gradient-to-r from-primary-600 to-accent-600 text-white rounded-2xl font-semibold hover:opacity-90 transition-all shadow-soft hover:shadow-medium active:scale-[0.98]">
-                  Save Changes
+                  保存修改
                 </button>
               </>
             ) : (
               <>
                 <button onClick={() => setIsEditing(true)} className="flex-1 px-6 py-4 border-2 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-2xl font-semibold hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-all shadow-soft">
-                  Edit
+                  编辑
                 </button>
                 <button onClick={() => setShowDeleteConfirm(true)} className="flex-1 px-6 py-4 bg-gradient-to-r from-rose-500 to-rose-600 text-white rounded-2xl font-semibold hover:opacity-90 transition-all shadow-soft hover:shadow-medium active:scale-[0.98]">
-                  Delete
+                  删除
                 </button>
               </>
             )}
@@ -368,16 +468,16 @@ export function WordDetailModal({ word, onClose, onDelete }: WordDetailModalProp
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
           <div className="bg-white dark:bg-slate-800 rounded-2xl p-8 max-w-sm w-full shadow-medium">
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Delete Word?</h3>
+            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-4">删除单词？</h3>
             <p className="text-slate-600 dark:text-slate-400 mb-8">
-              Are you sure you want to delete &quot;<span className="font-semibold">{word.word}</span>&quot;? This action cannot be undone.
+              确定要删除 &quot;<span className="font-semibold">{word.word}</span>&quot; 吗？此操作无法撤销。
             </p>
             <div className="flex gap-4">
               <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 px-6 py-3 border-2 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-xl font-semibold hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-all shadow-soft">
-                Cancel
+                取消
               </button>
               <button onClick={handleDelete} className="flex-1 px-6 py-3 bg-gradient-to-r from-rose-500 to-rose-600 text-white rounded-xl font-semibold hover:opacity-90 transition-all shadow-soft hover:shadow-medium active:scale-[0.98]">
-                Delete
+                删除
               </button>
             </div>
           </div>
