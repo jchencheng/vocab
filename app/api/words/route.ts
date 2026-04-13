@@ -117,7 +117,10 @@ export async function GET(request: NextRequest) {
             .from('word_book_items')
             .select(`
               word_id,
-              word:words(*)
+              source_type,
+              dictionary_id,
+              word:words(*),
+              dictionary:dictionary(*)
             `)
             .eq('word_book_id', bookId)
             .range(page * pageSize, (page + 1) * pageSize - 1);
@@ -146,8 +149,23 @@ export async function GET(request: NextRequest) {
         const wordIds = allBookItems.map((item: any) => item.word_id).filter(Boolean);
         console.log(`Extracted ${wordIds.length} word IDs:`, wordIds.slice(0, 5), '...');
         
+        // 处理单词书单词，支持词典词
         wordbookWords = allBookItems
-          .map((item: any) => item.word)
+          .map((item: any) => {
+            if (item.source_type === 'dictionary' && item.dictionary) {
+              // 词典词：使用 dictionary 数据，并标记 sourceType
+              return {
+                ...item.dictionary,
+                id: item.word_id || item.dictionary.id,
+                source_type: 'dictionary',
+                source_word_id: item.dictionary.id,
+              };
+            } else if (item.word) {
+              // 普通词：使用 words 表数据
+              return item.word;
+            }
+            return null;
+          })
           .filter((word: any) => word !== null);
         
         console.log(`After filtering null words: ${wordbookWords.length} words`);
@@ -278,10 +296,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'word and userId are required' }, { status: 400 });
     }
 
-    // 检查用户是否已添加过该单词
-    const wordText = word.word?.trim() || '';
+    // 兼容前端发送的格式：word 可以是字符串或对象
+    const wordText = typeof word === 'string' ? word.trim() : (word.word?.trim() || '');
     if (!wordText) {
-      return NextResponse.json({ error: 'word.text is required' }, { status: 400 });
+      return NextResponse.json({ error: 'word is required' }, { status: 400 });
     }
     
     const { data: existingWord, error: checkError } = await supabase
@@ -318,15 +336,17 @@ export async function POST(request: NextRequest) {
 
     // 2. 准备单词数据
     const isFromDictionary = !!dictWord;
+    // 兼容前端发送的格式：word 可以是字符串或对象
+    const wordObj = typeof word === 'string' ? {} : word;
     const wordData = {
-      ...word,
+      ...wordObj,
       id: randomUUID(),
       word: wordText, // 使用处理后的单词文本
       // 如果 dictionary 中有，使用 dictionary 的数据
-      phonetic: dictWord?.phonetic || word.phonetic,
+      phonetic: dictWord?.phonetic || wordObj.phonetic,
       meanings: isFromDictionary 
         ? convertTranslationToMeanings(dictWord?.translation || '')
-        : (word.meanings || []),
+        : (wordObj.meanings || []),
       source_type: isFromDictionary ? 'dictionary' : 'custom',
       source_word_id: dictWord?.id || null,
       createdAt: Date.now(),
