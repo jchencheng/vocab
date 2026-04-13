@@ -1,18 +1,18 @@
 {
   "builtinWords": {
-    "completed": false,
-    "lastIndex": 950,
-    "matched": 882,
-    "unmatched": 68
+    "completed": true,
+    "lastIndex": 1000,
+    "matched": 928,
+    "unmatched": 72
   },
   "userWords": {
-    "completed": false,
-    "lastIndex": 0,
-    "matched": 0
+    "completed": true,
+    "lastIndex": 15,
+    "matched": 14
   },
   "wordBooks": {
     "completed": false,
-    "lastIndex": 0,
+    "lastIndex": 370,
     "migrated": 0
   }
 }
