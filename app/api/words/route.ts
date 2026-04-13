@@ -121,26 +121,39 @@ export async function GET(request: NextRequest) {
 
       if (allBookItems.length > 0) {
         const wordIds = allBookItems.map((item: any) => item.word_id).filter(Boolean);
+        console.log(`Extracted ${wordIds.length} word IDs:`, wordIds.slice(0, 5), '...');
+        
         wordbookWords = allBookItems
           .map((item: any) => item.word)
           .filter((word: any) => word !== null);
 
         // 获取这些单词的用户进度记录（分批查询）
-        for (let i = 0; i < wordIds.length; i += 1000) {
-          const batch = wordIds.slice(i, i + 1000);
-          const { data: progressData, error: progressError } = await supabase
-            .from('user_word_progress')
-            .select('*')
-            .eq('user_id', userId)
-            .in('word_id', batch);
+        if (wordIds.length > 0) {
+          console.log(`Fetching progress for ${wordIds.length} words, user ${userId}`);
+          
+          for (let i = 0; i < wordIds.length; i += 1000) {
+            const batch = wordIds.slice(i, i + 1000);
+            
+            if (batch.length === 0) continue;
+            
+            try {
+              const { data: progressData, error: progressError } = await supabase
+                .from('user_word_progress')
+                .select('*')
+                .eq('user_id', userId)
+                .in('word_id', batch);
 
-          if (progressError) {
-            console.error('Error fetching word progress:', progressError);
-          } else if (progressData) {
-            // 创建 word_id -> progress 的映射
-            progressData.forEach((p: any) => {
-              wordbookProgress.set(p.word_id, p);
-            });
+              if (progressError) {
+                console.error(`Error fetching word progress batch ${i/1000 + 1}:`, progressError);
+              } else if (progressData) {
+                // 创建 word_id -> progress 的映射
+                progressData.forEach((p: any) => {
+                  wordbookProgress.set(p.word_id, p);
+                });
+              }
+            } catch (e) {
+              console.error(`Exception fetching progress batch ${i/1000 + 1}:`, e);
+            }
           }
         }
         
