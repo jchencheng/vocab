@@ -289,6 +289,11 @@ export function WordDetailModal({ word, onClose, onDelete }: WordDetailModalProp
                     {word.phonetic && (
                       <span className="text-lg text-slate-500 dark:text-slate-400 font-mono">{word.phonetic}</span>
                     )}
+                    {isFromDictionary && (
+                      <span className="text-xs font-bold text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-800/50 px-2.5 py-1 rounded-full border border-blue-200 dark:border-blue-700">
+                        🔒 词典词
+                      </span>
+                    )}
                   </div>
                   {word.tags.length > 0 && (
                     <div className="flex flex-wrap gap-2 mb-4">
