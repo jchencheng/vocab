@@ -154,11 +154,15 @@ export async function GET(request: NextRequest) {
           .map((item: any) => {
             if (item.source_type === 'dictionary' && item.dictionary) {
               // 词典词：使用 dictionary 数据，并标记 sourceType
+              // 将 translation 转换为 meanings 格式
+              const meanings = convertTranslationToMeanings(item.dictionary.translation || '');
               return {
                 ...item.dictionary,
                 id: item.word_id || item.dictionary.id,
                 source_type: 'dictionary',
                 source_word_id: item.dictionary.id,
+                meanings: meanings,
+                phonetics: [], // 词典词暂时没有 phonetics
               };
             } else if (item.word) {
               // 普通词：使用 words 表数据
@@ -272,13 +276,17 @@ function convertTranslationToMeanings(translation: string): any[] {
     if (match) {
       meanings.push({
         partOfSpeech: match[1],
-        definitions: match[2].split(/[,;]/).map(d => d.trim()).filter(Boolean)
+        definitions: match[2].split(/[,;]/).map(d => d.trim()).filter(Boolean).map(def => ({
+          definition: def,
+        }))
       });
     } else if (part.trim()) {
       // 没有词性标记的，作为通用释义
       meanings.push({
         partOfSpeech: 'general',
-        definitions: part.split(/[,;]/).map(d => d.trim()).filter(Boolean)
+        definitions: part.split(/[,;]/).map(d => d.trim()).filter(Boolean).map(def => ({
+          definition: def,
+        }))
       });
     }
   }
