@@ -252,6 +252,47 @@ export function Review() {
     ]).catch(console.error);
   }, [currentWord, currentIndex, queue.length, saveProgress, updateWord]);
 
+  const handleDelete = useCallback(async () => {
+    if (!currentWord || !user?.id) return;
+
+    // 确认删除
+    if (!confirm('确定要从复习队列中删除这个单词吗？')) {
+      return;
+    }
+
+    const isLastWord = currentIndex >= queue.length - 1;
+    const newIndex = isLastWord ? currentIndex : currentIndex + 1;
+
+    // 立即从队列中移除
+    setQueue(prev => prev.filter((_, idx) => idx !== currentIndex));
+
+    // 立即切换 UI
+    if (isLastWord || queue.length <= 1) {
+      setIsComplete(true);
+    } else {
+      // 不增加 currentIndex，因为当前单词被删除了，后面的单词会自动前移
+      setShowAnswer(false);
+    }
+    
+    // 异步删除单词
+    try {
+      const response = await fetch('/api/words/delete-from-review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          wordId: currentWord.id,
+        }),
+      });
+
+      if (!response.ok) {
+        console.error('Failed to delete word from review');
+      }
+    } catch (error) {
+      console.error('Error deleting word:', error);
+    }
+  }, [currentWord, currentIndex, queue.length, user?.id]);
+
   const handleRestart = useCallback(async () => {
     if (!user?.id) return;
     
@@ -507,7 +548,14 @@ export function Review() {
       </div>
 
       {!showAnswer ? (
-        <div className="flex gap-4">
+        <div className="flex gap-3">
+          <button
+            onClick={handleDelete}
+            className="px-4 py-5 border-2 border-rose-300 dark:border-rose-700 text-rose-600 dark:text-rose-400 rounded-2xl font-semibold hover:bg-rose-50 dark:hover:bg-rose-900/30 transition-all shadow-soft"
+            title="从复习队列删除"
+          >
+            🗑️
+          </button>
           <button
             onClick={handlePostpone}
             className="flex-1 px-6 py-5 border-2 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-2xl font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-all shadow-soft"

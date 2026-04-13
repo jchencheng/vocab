@@ -122,7 +122,7 @@ async function fallbackGetReviewWords(userId: string, now: number, limit: number
       return NextResponse.json([]);
     }
 
-    // 3. 获取单词详情和进度记录（只获取必要的字段）
+    // 3. 获取单词详情和进度记录（只获取必要的字段，排除 is_excluded = true 的）
     const { data: words, error: wordsError } = await supabase
       .from('words')
       .select(`
@@ -135,12 +135,14 @@ async function fallbackGetReviewWords(userId: string, now: number, limit: number
           ease_factor,
           review_count,
           next_review_at,
-          quality
+          quality,
+          is_excluded
         )
       `)
       .in('id', allWordIds.slice(0, 1000)) // 限制查询数量
       .eq('user_word_progress.user_id', userId)
       .lte('user_word_progress.next_review_at', now)
+      .or('user_word_progress.is_excluded.is.null,user_word_progress.is_excluded.eq.false', { foreignTable: 'user_word_progress' })
       .order('user_word_progress.next_review_at', { ascending: true })
       .limit(limit);
 
