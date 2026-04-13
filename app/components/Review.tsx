@@ -92,32 +92,34 @@ export function Review() {
         const reviewWords = await fetchWordsForReview(user.id, maxDailyReviews * 2);
         console.log('Fetched review words:', reviewWords.length);
 
-        // 转换为 Word 类型
-        const convertedWords: Word[] = reviewWords.map((rw: WordForReview) => ({
-          id: rw.id,
-          word: rw.word,
-          phonetic: rw.phonetic,
-          phonetics: [],
-          meanings: [{
-            partOfSpeech: '',
-            definitions: [{
-              definition: '',
-              chineseDefinition: rw.chineseDefinition,
+        // 转换为 Word 类型，并按 ID 排序确保顺序一致
+        const convertedWords: Word[] = reviewWords
+          .map((rw: WordForReview) => ({
+            id: rw.id,
+            word: rw.word,
+            phonetic: rw.phonetic,
+            phonetics: [],
+            meanings: [{
+              partOfSpeech: '',
+              definitions: [{
+                definition: '',
+                chineseDefinition: rw.chineseDefinition,
+                synonyms: [],
+                antonyms: []
+              }],
               synonyms: [],
               antonyms: []
             }],
-            synonyms: [],
-            antonyms: []
-          }],
-          tags: [],
-          interval: rw.interval,
-          easeFactor: rw.easeFactor,
-          reviewCount: rw.reviewCount,
-          nextReviewAt: rw.nextReviewAt,
-          quality: rw.quality,
-          createdAt: Date.now(),
-          updatedAt: Date.now()
-        }));
+            tags: [],
+            interval: rw.interval,
+            easeFactor: rw.easeFactor,
+            reviewCount: rw.reviewCount,
+            nextReviewAt: rw.nextReviewAt,
+            quality: rw.quality,
+            createdAt: Date.now(),
+            updatedAt: Date.now()
+          }))
+          .sort((a, b) => a.id.localeCompare(b.id)); // 按 ID 排序确保确定性顺序
 
         // 根据学习模式筛选
         let filteredWords = convertedWords;
