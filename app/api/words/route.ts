@@ -279,11 +279,16 @@ export async function POST(request: NextRequest) {
     }
 
     // 检查用户是否已添加过该单词
+    const wordText = word.word?.trim() || '';
+    if (!wordText) {
+      return NextResponse.json({ error: 'word.text is required' }, { status: 400 });
+    }
+    
     const { data: existingWord, error: checkError } = await supabase
       .from('words')
       .select('*')
       .eq('user_id', userId)
-      .ilike('word', word.word.trim())
+      .ilike('word', wordText)
       .single();
 
     if (checkError && checkError.code !== 'PGRST116') {
@@ -303,7 +308,7 @@ export async function POST(request: NextRequest) {
     const { data: dictWord, error: dictError } = await supabase
       .from('dictionary')
       .select('id, word, phonetic, translation')
-      .ilike('word', word.word.trim())
+      .ilike('word', wordText)
       .single();
 
     if (dictError && dictError.code !== 'PGRST116') {
@@ -316,10 +321,11 @@ export async function POST(request: NextRequest) {
     const wordData = {
       ...word,
       id: randomUUID(),
+      word: wordText, // 使用处理后的单词文本
       // 如果 dictionary 中有，使用 dictionary 的数据
       phonetic: dictWord?.phonetic || word.phonetic,
       meanings: isFromDictionary 
-        ? convertTranslationToMeanings(dictWord.translation)
+        ? convertTranslationToMeanings(dictWord?.translation || '')
         : (word.meanings || []),
       source_type: isFromDictionary ? 'dictionary' : 'custom',
       source_word_id: dictWord?.id || null,
@@ -394,7 +400,7 @@ export async function POST(request: NextRequest) {
 
     // 6. 将单词关联到自定义单词本
     if (customBook) {
-      await supabase
+      const { error: itemError } = await supabase
         .from('word_book_items')
         .insert({
           word_book_id: customBook.id,
@@ -403,6 +409,11 @@ export async function POST(request: NextRequest) {
           source_type: isFromDictionary ? 'dictionary' : 'word',
           dictionary_id: dictWord?.id || null
         });
+
+      if (itemError) {
+        console.error('Error adding word to wordbook:', itemError);
+        // 非致命错误，继续执行
+      }
 
       // 更新单词书单词计数
       const { data: countData } = await supabase

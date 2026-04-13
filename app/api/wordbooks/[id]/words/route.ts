@@ -27,7 +27,7 @@ function convertTranslationToMeanings(translation: string): any[] {
 }
 
 // 将下划线式字段名转换为驼峰式
-function mapWordFromDB(dbWord: any, dictData?: any) {
+function mapWordFromDB(dbWord: any, dictData?: any, isFromDict: boolean = false) {
   // 如果有 dictionary 数据，优先使用
   const word = dbWord || {};
   const dict = dictData || {};
@@ -53,8 +53,8 @@ function mapWordFromDB(dbWord: any, dictData?: any) {
     createdAt: word.created_at || Date.now(),
     updatedAt: word.updated_at || Date.now(),
     quality: word.quality || 0,
-    sourceType: word.source_type || 'custom',
-    sourceWordId: word.source_word_id || null,
+    sourceType: isFromDict ? 'dictionary' : (word.source_type || 'custom'),
+    sourceWordId: isFromDict ? dict.id : (word.source_word_id || null),
   };
 }
 
@@ -115,10 +115,10 @@ export async function GET(
     const words = data?.map((item: any) => {
       if (item.source_type === 'dictionary' && item.dictionary) {
         // 使用 dictionary 数据
-        return mapWordFromDB(null, item.dictionary);
+        return mapWordFromDB(null, item.dictionary, true);
       } else {
         // 使用 words 表数据
-        return mapWordFromDB(item.word, null);
+        return mapWordFromDB(item.word, null, false);
       }
     }) || [];
 
