@@ -126,6 +126,8 @@ export async function GET(request: NextRequest) {
         wordbookWords = allBookItems
           .map((item: any) => item.word)
           .filter((word: any) => word !== null);
+        
+        console.log(`After filtering null words: ${wordbookWords.length} words`);
 
         // 获取该用户的所有进度记录（不分批，一次性获取）
         // 然后过滤出需要的单词进度
@@ -172,6 +174,7 @@ export async function GET(request: NextRequest) {
     );
 
     const allWords = [...userWordsMapped, ...wordbookWordsMapped];
+    console.log(`Returning ${allWords.length} total words (${userWordsMapped.length} user + ${wordbookWordsMapped.length} wordbook)`);
     return NextResponse.json(allWords);
   } catch (error: any) {
     console.error('API error:', error);
