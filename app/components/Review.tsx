@@ -2,8 +2,10 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
-import { calculateNextReview, getDueWords, shuffleWords, limitWords, postponeToTomorrow, getTodayReviewQueue, postponeWithPriority, getDueWordsByStudyMode } from '../utils/spacedRepetition';
-import { getIntervalText, getChineseDefinition, getExampleSentence, playAudio, hasAudio } from '../utils/wordUtils';
+import { useAuth } from '../context/AuthContext';
+import { calculateNextReview, shuffleWords, limitWords, postponeToTomorrow, postponeWithPriority } from '../utils/spacedRepetition';
+import { getIntervalText, getExampleSentence, getChineseDefinition, playAudio, hasAudio } from '../utils/wordUtils';
+import { fetchWordsForReview, WordForReview } from '../services/apiClient';
 import { QUALITY_LABELS } from '../constants';
 import type { Word } from '../types';
 
@@ -17,6 +19,7 @@ const STUDY_MODE_LABELS: Record<string, string> = {
 
 export function Review() {
   const { words, settings, updateWord, refreshWords, learningSequence, wordBooks } = useApp();
+  const { user } = useAuth();
   const [queue, setQueue] = useState<Word[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showAnswer, setShowAnswer] = useState(false);
@@ -25,6 +28,7 @@ export function Review() {
   const [postponedCount, setPostponedCount] = useState(0);
   const [isInitialized, setIsInitialized] = useState(false);
   const [primaryBookWordIds, setPrimaryBookWordIds] = useState<Set<string>>(new Set());
+  const [isLoading, setIsLoading] = useState(true);
 
   const maxDailyReviews = settings.maxDailyReviews || 50;
   const studyMode = settings.studyMode || 'mixed';
@@ -33,13 +37,6 @@ export function Review() {
   // 获取主学单词书中的单词ID
   useEffect(() => {
     if (!primaryWordBookId || studyMode === 'mixed') {
-      setPrimaryBookWordIds(new Set());
-      return;
-    }
-
-    // 从 wordBooks 中找到主学单词书
-    const primaryBook = wordBooks.find(b => b.id === primaryWordBookId);
-    if (!primaryBook) {
       setPrimaryBookWordIds(new Set());
       return;
     }
@@ -59,54 +56,104 @@ export function Review() {
     };
 
     fetchPrimaryBookWords();
-  }, [primaryWordBookId, studyMode, wordBooks]);
+    // 只依赖 primaryWordBookId 和 studyMode，避免 wordBooks 变化导致循环
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [primaryWordBookId, studyMode]);
 
-  // 初始化复习队列，并自动推迟超出限制的单词
-  // 只在组件挂载时执行一次，避免 updateWord 后重置进度
+  // 初始化复习队列（使用优化后的 API）
+  // 只在组件挂载时执行一次
   useEffect(() => {
-    if (isInitialized) return;
-    
+    if (isInitialized || !user?.id) {
+      console.log('Review useEffect skipped - already initialized or no user');
+      return;
+    }
+
     const initReviewQueue = async () => {
-      // 根据学习模式获取待复习单词
-      let dueWords: Word[];
-      
-      if (studyMode === 'mixed' || !primaryWordBookId || primaryBookWordIds.size === 0) {
-        // 混合模式或没有主学单词书，使用所有单词
-        dueWords = getDueWords(words);
-      } else {
-        // 根据学习模式筛选
-        dueWords = getDueWordsByStudyMode(words, studyMode, primaryWordBookId, 
-          Array.from(primaryBookWordIds).map(id => ({ word_id: id, word_book_id: primaryWordBookId }))
-        );
+      console.log('Review initReviewQueue START (optimized)');
+      setIsLoading(true);
+
+      try {
+        // 使用优化后的 API 获取复习单词
+        // 这个 API 使用单查询 JOIN，只返回轻量级数据
+        const reviewWords = await fetchWordsForReview(user.id, maxDailyReviews * 2); // 获取双倍数量，用于筛选
+
+        console.log('Fetched review words (optimized):', reviewWords.length);
+
+        // 转换为 Word 类型（兼容现有代码）
+        const convertedWords: Word[] = reviewWords.map((rw: WordForReview) => ({
+          id: rw.id,
+          word: rw.word,
+          phonetic: rw.phonetic,
+          phonetics: [], // 轻量级数据不包含 phonetics
+          meanings: [{ // 构造一个最小化的 meaning 结构
+            partOfSpeech: '',
+            definitions: [{
+              definition: '',
+              chineseDefinition: rw.chineseDefinition
+            }],
+            synonyms: [],
+            antonyms: []
+          }],
+          tags: [],
+          interval: rw.interval,
+          easeFactor: rw.easeFactor,
+          reviewCount: rw.reviewCount,
+          nextReviewAt: rw.nextReviewAt,
+          quality: rw.quality,
+          createdAt: Date.now(),
+          updatedAt: Date.now()
+        }));
+
+        // 根据学习模式筛选（如果需要）
+        let filteredWords = convertedWords;
+        if (studyMode !== 'mixed' && primaryWordBookId && primaryBookWordIds.size > 0) {
+          const primaryIds = primaryBookWordIds;
+          if (studyMode === 'book-only') {
+            filteredWords = convertedWords.filter(w => primaryIds.has(w.id));
+          } else if (studyMode === 'book-priority') {
+            const primary = convertedWords.filter(w => primaryIds.has(w.id));
+            const other = convertedWords.filter(w => !primaryIds.has(w.id));
+            filteredWords = [...primary, ...other];
+          }
+        }
+
+        // 打乱顺序并限制数量
+        const shuffled = shuffleWords(filteredWords);
+        const limited = limitWords(shuffled, maxDailyReviews);
+
+        // 获取需要推迟的单词（这些单词已经由 API 筛选过，都是到期的）
+        const postponedWords = shuffled.slice(maxDailyReviews);
+
+        setQueue(limited);
+        setCurrentIndex(0);
+        setShowAnswer(false);
+        setIsComplete(false);
+        setPostponedCount(postponedWords.length);
+        setIsInitialized(true);
+        console.log('Review initReviewQueue END - queue:', limited.length, 'postponed:', postponedWords.length);
+      } catch (error) {
+        console.error('Error initializing review queue:', error);
+        // 出错时回退到旧方法
+        fallbackInitReviewQueue();
+      } finally {
+        setIsLoading(false);
       }
-      
-      // 打乱顺序并限制数量
+    };
+
+    // 备用方案：使用旧的 words 数据
+    const fallbackInitReviewQueue = () => {
+      console.log('Using fallback init method');
+      const dueWords = words.filter(w => w.nextReviewAt <= Date.now());
       const shuffled = shuffleWords(dueWords);
       const limited = limitWords(shuffled, maxDailyReviews);
-      
-      // 获取需要推迟的单词
-      const postponedWords = shuffled.slice(maxDailyReviews);
-      
-      // 如果有需要推迟的单词，自动推迟它们
-      if (postponedWords.length > 0) {
-        const postponed = postponeWithPriority(postponedWords);
-        // 批量更新推迟的单词
-        for (const word of postponed) {
-          await updateWord(word);
-        }
-      }
-      
       setQueue(limited);
-      setCurrentIndex(0);
-      setShowAnswer(false);
-      setIsComplete(false);
-      setPostponedCount(postponedWords.length);
       setIsInitialized(true);
+      setIsLoading(false);
     };
-    
+
     initReviewQueue();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isInitialized]); // 只在 isInitialized 变化时执行，避免 words/updateWord 变化导致重新初始化
+  }, [isInitialized, user?.id]); // 只在 isInitialized 或 user 变化时执行
 
   const currentWord = queue[currentIndex];
   // 进度从0%开始，完成所有单词后达到100%
@@ -191,6 +238,23 @@ export function Review() {
     setPostponedCount(postponedWords.length);
     setIsInitialized(true);
   }, [words, maxDailyReviews, updateWord, studyMode, primaryWordBookId, primaryBookWordIds]);
+
+  // 加载中状态
+  if (isLoading) {
+    return (
+      <div className="max-w-2xl mx-auto text-center py-16 animate-fade-in">
+        <div className="bg-white dark:bg-slate-800/80 backdrop-blur-xl rounded-3xl shadow-medium border border-slate-200/50 dark:border-slate-700/50 p-10">
+          <div className="animate-spin rounded-full h-14 w-14 border-4 border-primary-200 border-t-primary-600 mx-auto mb-6"></div>
+          <h2 className="font-display text-2xl font-bold text-slate-900 dark:text-white mb-4">
+            Loading review queue...
+          </h2>
+          <p className="text-slate-600 dark:text-slate-400 text-lg">
+            Preparing your words for today
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (queue.length === 0) {
     return (
@@ -379,7 +443,7 @@ export function Review() {
                 </div>
                 <div className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-2xl">
                   <div className="text-2xl font-bold text-rose-600 dark:text-rose-400 mb-1">
-                    {currentWord.easeFactor.toFixed(2)}
+                    {(currentWord.easeFactor || 2.5).toFixed(2)}
                   </div>
                   <div className="text-sm text-slate-500 dark:text-slate-400">Ease</div>
                 </div>

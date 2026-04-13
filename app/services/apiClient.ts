@@ -94,3 +94,26 @@ export async function generateContent(prompt: string, wordList?: string[], model
   });
   return response;
 }
+
+// ========== Review API (Optimized) ==========
+
+// 轻量级单词类型（用于复习）
+export interface WordForReview {
+  id: string;
+  word: string;
+  phonetic?: string;
+  chineseDefinition: string;
+  interval: number;
+  easeFactor: number;
+  reviewCount: number;
+  nextReviewAt: number;
+  quality: number;
+}
+
+/**
+ * 获取复习单词（优化版）
+ * 使用单查询 JOIN，只返回轻量级数据
+ */
+export async function fetchWordsForReview(userId: string, limit: number = 100): Promise<WordForReview[]> {
+  return fetchAPI(`${API_BASE_URL}/words/review?userId=${userId}&limit=${limit}`);
+}

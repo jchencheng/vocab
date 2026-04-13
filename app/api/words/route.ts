@@ -24,6 +24,25 @@ function mapWordToDB(word: any) {
 
 // 将下划线式字段名转换为驼峰式（用于从数据库读取）
 function mapWordFromDB(dbWord: any, progress?: any): any {
+  // 确保 next_review_at 是数字类型
+  const getNextReviewAt = () => {
+    const now = Date.now();
+    // 优先使用进度记录的 next_review_at（如果存在且是有效值）
+    if (progress?.next_review_at != null) {
+      const val = progress.next_review_at;
+      const nextReviewAt = typeof val === 'number' ? val : new Date(val).getTime();
+      // 如果复习时间在未来，且间隔为0（新单词），则立即可复习
+      // 这样可以修复之前错误设置的进度记录
+      const interval = progress?.interval ?? 0;
+      if (interval === 0 && nextReviewAt > now) {
+        return now;
+      }
+      return nextReviewAt;
+    }
+    // 如果没有进度记录，新单词立即可复习
+    return now;
+  };
+
   return {
     id: dbWord.id,
     word: dbWord.word,
@@ -36,7 +55,7 @@ function mapWordFromDB(dbWord: any, progress?: any): any {
     interval: progress?.interval ?? dbWord.interval ?? 1,
     easeFactor: progress?.ease_factor ?? dbWord.ease_factor ?? 2.5,
     reviewCount: progress?.review_count ?? dbWord.review_count ?? 0,
-    nextReviewAt: progress?.next_review_at ?? dbWord.next_review_at ?? Date.now(),
+    nextReviewAt: getNextReviewAt(),
     createdAt: dbWord.created_at ?? Date.now(),
     updatedAt: progress?.updated_at ?? dbWord.updated_at ?? Date.now(),
     quality: progress?.quality ?? dbWord.quality ?? 0,
@@ -134,28 +153,48 @@ export async function GET(request: NextRequest) {
         console.log(`Fetching all progress records for user ${userId}`);
         
         try {
-          const { data: allProgress, error: progressError } = await supabase
-            .from('user_word_progress')
-            .select('*')
-            .eq('user_id', userId);
+          // 获取用户的所有进度记录，然后过滤出需要的单词
+          // 使用 range 分批获取所有记录
+          let allProgress: any[] = [];
+          let page = 0;
+          const pageSize = 1000;
+          
+          while (true) {
+            const { data: batchProgress, error: progressError } = await supabase
+              .from('user_word_progress')
+              .select('*')
+              .eq('user_id', userId)
+              .range(page * pageSize, (page + 1) * pageSize - 1);
 
-          if (progressError) {
-            console.error('Error fetching word progress:', progressError);
-          } else if (allProgress) {
-            // 创建 word_id 集合用于快速查找
-            const wordIdSet = new Set(wordIds);
-            // 过滤出需要的进度记录
-            allProgress.forEach((p: any) => {
-              if (wordIdSet.has(p.word_id)) {
-                wordbookProgress.set(p.word_id, p);
-              }
-            });
+            if (progressError) {
+              console.error(`Error fetching progress page ${page + 1}:`, progressError);
+              break;
+            }
+            
+            if (!batchProgress || batchProgress.length === 0) {
+              break;
+            }
+            
+            allProgress = allProgress.concat(batchProgress);
+            
+            if (batchProgress.length < pageSize) {
+              break;
+            }
+            page++;
           }
+          
+          // 过滤出需要的进度记录
+          const wordIdSet = new Set(wordIds);
+          allProgress.forEach((p: any) => {
+            if (wordIdSet.has(p.word_id)) {
+              wordbookProgress.set(p.word_id, p);
+            }
+          });
+          
+          console.log(`Fetched ${wordbookProgress.size} progress records for user ${userId} (expected ${wordIds.length}, total in db: ${allProgress.length})`);
         } catch (e) {
           console.error('Exception fetching progress:', e);
         }
-        
-        console.log(`Fetched ${wordbookProgress.size} progress records for user ${userId}`);
       }
     }
 
@@ -172,6 +211,22 @@ export async function GET(request: NextRequest) {
     const wordbookWordsMapped = uniqueWordbookWords.map((w: any) => 
       mapWordFromDB(w, wordbookProgress.get(w.id))
     );
+
+    // 调试：检查 next_review_at 值
+    const now = Date.now();
+    const dueWords = wordbookWordsMapped.filter((w: any) => w.nextReviewAt <= now);
+    console.log(`Wordbook words: ${wordbookWordsMapped.length}, due now: ${dueWords.length}`);
+    if (wordbookWordsMapped.length > 0) {
+      const sample = wordbookWordsMapped[0];
+      const sampleWordId = uniqueWordbookWords[0]?.id;
+      const sampleProgress = wordbookProgress.get(sampleWordId);
+      console.log(`Sample word: ${sampleWordId}`);
+      console.log(`  Progress record:`, sampleProgress ? {
+        next_review_at: sampleProgress.next_review_at,
+        type: typeof sampleProgress.next_review_at
+      } : 'No progress record');
+      console.log(`  Mapped nextReviewAt: ${sample.nextReviewAt}, now: ${now}, isDue: ${sample.nextReviewAt <= now}`);
+    }
 
     const allWords = [...userWordsMapped, ...wordbookWordsMapped];
     console.log(`Returning ${allWords.length} total words (${userWordsMapped.length} user + ${wordbookWordsMapped.length} wordbook)`);

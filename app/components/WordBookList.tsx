@@ -65,7 +65,8 @@ export function WordBookList() {
     if (user?.id) {
       loadWordBooks();
     }
-  }, [user?.id, loadWordBooks]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]); // 只依赖 user?.id，避免 loadWordBooks 引用变化导致循环
 
   const handleModeChange = useCallback(async (mode: StudyMode) => {
     await saveSettings({ ...settings, studyMode: mode });
