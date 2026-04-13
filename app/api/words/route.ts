@@ -127,34 +127,30 @@ export async function GET(request: NextRequest) {
           .map((item: any) => item.word)
           .filter((word: any) => word !== null);
 
-        // 获取这些单词的用户进度记录（分批查询）
-        if (wordIds.length > 0) {
-          console.log(`Fetching progress for ${wordIds.length} words, user ${userId}`);
-          
-          for (let i = 0; i < wordIds.length; i += 1000) {
-            const batch = wordIds.slice(i, i + 1000);
-            
-            if (batch.length === 0) continue;
-            
-            try {
-              const { data: progressData, error: progressError } = await supabase
-                .from('user_word_progress')
-                .select('*')
-                .eq('user_id', userId)
-                .in('word_id', batch);
+        // 获取该用户的所有进度记录（不分批，一次性获取）
+        // 然后过滤出需要的单词进度
+        console.log(`Fetching all progress records for user ${userId}`);
+        
+        try {
+          const { data: allProgress, error: progressError } = await supabase
+            .from('user_word_progress')
+            .select('*')
+            .eq('user_id', userId);
 
-              if (progressError) {
-                console.error(`Error fetching word progress batch ${i/1000 + 1}:`, progressError);
-              } else if (progressData) {
-                // 创建 word_id -> progress 的映射
-                progressData.forEach((p: any) => {
-                  wordbookProgress.set(p.word_id, p);
-                });
+          if (progressError) {
+            console.error('Error fetching word progress:', progressError);
+          } else if (allProgress) {
+            // 创建 word_id 集合用于快速查找
+            const wordIdSet = new Set(wordIds);
+            // 过滤出需要的进度记录
+            allProgress.forEach((p: any) => {
+              if (wordIdSet.has(p.word_id)) {
+                wordbookProgress.set(p.word_id, p);
               }
-            } catch (e) {
-              console.error(`Exception fetching progress batch ${i/1000 + 1}:`, e);
-            }
+            });
           }
+        } catch (e) {
+          console.error('Exception fetching progress:', e);
         }
         
         console.log(`Fetched ${wordbookProgress.size} progress records for user ${userId}`);
