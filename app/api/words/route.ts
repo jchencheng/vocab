@@ -43,6 +43,7 @@ function mapWordFromDB(dbWord: any) {
 }
 
 // GET /api/words?userId=xxx
+// 返回用户手动添加的单词 + 用户学习序列中单词书的单词（不重复）
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const userId = searchParams.get('userId');
@@ -52,19 +53,65 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const { data, error } = await supabase
+    // 1. 获取用户手动添加的单词
+    const { data: userWords, error: userWordsError } = await supabase
       .from('words')
       .select('*')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error('Error fetching words:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    if (userWordsError) {
+      console.error('Error fetching user words:', userWordsError);
+      return NextResponse.json({ error: userWordsError.message }, { status: 500 });
     }
 
-    // 将数据库字段名转换为前端使用的驼峰式
-    const words = data?.map(mapWordFromDB) || [];
+    // 2. 获取用户学习序列中的单词书ID
+    const { data: learningSequences, error: seqError } = await supabase
+      .from('user_learning_sequences')
+      .select('word_book_id')
+      .eq('user_id', userId);
+
+    if (seqError) {
+      console.error('Error fetching learning sequences:', seqError);
+    }
+
+    // 3. 获取学习序列中单词书的单词（系统单词，user_id 为 null）
+    let wordbookWords: any[] = [];
+    if (learningSequences && learningSequences.length > 0) {
+      const wordBookIds = learningSequences.map(seq => seq.word_book_id);
+      
+      // 获取这些单词书中的所有单词
+      const { data: bookItems, error: itemsError } = await supabase
+        .from('word_book_items')
+        .select(`
+          word:words(*)
+        `)
+        .in('word_book_id', wordBookIds);
+
+      if (itemsError) {
+        console.error('Error fetching wordbook items:', itemsError);
+      } else if (bookItems) {
+        wordbookWords = bookItems
+          .map((item: any) => item.word)
+          .filter((word: any) => word !== null);
+      }
+    }
+
+    // 4. 合并单词，以用户手动添加的为准（去重）
+    const userWordSet = new Set(userWords?.map(w => w.word.toLowerCase()) || []);
+    
+    // 过滤掉用户已手动添加的单词书单词
+    const uniqueWordbookWords = wordbookWords.filter(
+      (word: any) => !userWordSet.has(word.word.toLowerCase())
+    );
+
+    // 5. 合并并转换格式
+    const allWords = [
+      ...(userWords || []),
+      ...uniqueWordbookWords
+    ];
+
+    const words = allWords.map(mapWordFromDB);
     return NextResponse.json(words);
   } catch (error: any) {
     console.error('API error:', error);
