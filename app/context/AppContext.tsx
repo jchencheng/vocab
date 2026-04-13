@@ -272,6 +272,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     async function loadData() {
       const userId = user?.id;
+      console.log('loadData called, userId:', userId, 'lastUserId:', lastUserIdRef.current, 'isAuthenticated:', isAuthenticated);
       
       if (!isAuthenticated || !userId) {
         setIsLoading(false);
@@ -281,6 +282,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       // 只有当用户真正变化时才重新加载数据
       if (lastUserIdRef.current === userId) {
+        console.log('Same user, skipping loadData');
         setIsLoading(false);
         return;
       }
