@@ -19,6 +19,8 @@ function mapWordToDB(word: any) {
     created_at: word.createdAt || Date.now(),
     updated_at: word.updatedAt || Date.now(),
     quality: word.quality || 0,
+    source_type: word.source_type || 'custom',
+    source_word_id: word.source_word_id || null,
   };
 }
 
@@ -59,6 +61,8 @@ function mapWordFromDB(dbWord: any, progress?: any): any {
     createdAt: dbWord.created_at ?? Date.now(),
     updatedAt: progress?.updated_at ?? dbWord.updated_at ?? Date.now(),
     quality: progress?.quality ?? dbWord.quality ?? 0,
+    sourceType: dbWord.source_type || 'custom',
+    sourceWordId: dbWord.source_word_id || null,
   };
 }
 
@@ -237,6 +241,33 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// 将 dictionary 的 translation 转换为 meanings 格式
+function convertTranslationToMeanings(translation: string): any[] {
+  if (!translation) return [];
+  
+  // 按词性分割，例如 "n. 单词\nv. 说话"
+  const parts = translation.split(/\n/);
+  const meanings: any[] = [];
+  
+  for (const part of parts) {
+    const match = part.match(/^([a-z]+)\.\s*(.+)$/i);
+    if (match) {
+      meanings.push({
+        partOfSpeech: match[1],
+        definitions: match[2].split(/[,;]/).map(d => d.trim()).filter(Boolean)
+      });
+    } else if (part.trim()) {
+      // 没有词性标记的，作为通用释义
+      meanings.push({
+        partOfSpeech: 'general',
+        definitions: part.split(/[,;]/).map(d => d.trim()).filter(Boolean)
+      });
+    }
+  }
+  
+  return meanings;
+}
+
 // POST /api/words
 export async function POST(request: NextRequest) {
   try {
@@ -268,20 +299,45 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 准备单词数据
+    // 1. 优先查询 dictionary 表
+    const { data: dictWord, error: dictError } = await supabase
+      .from('dictionary')
+      .select('id, word, phonetic, translation')
+      .ilike('word', word.word.trim())
+      .single();
+
+    if (dictError && dictError.code !== 'PGRST116') {
+      console.error('Error checking dictionary:', dictError);
+      // 非致命错误，继续以 custom 方式添加
+    }
+
+    // 2. 准备单词数据
+    const isFromDictionary = !!dictWord;
     const wordData = {
       ...word,
       id: randomUUID(),
+      // 如果 dictionary 中有，使用 dictionary 的数据
+      phonetic: dictWord?.phonetic || word.phonetic,
+      meanings: isFromDictionary 
+        ? convertTranslationToMeanings(dictWord.translation)
+        : (word.meanings || []),
+      source_type: isFromDictionary ? 'dictionary' : 'custom',
+      source_word_id: dictWord?.id || null,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
 
     const dbWord = mapWordToDB(wordData);
 
-    // 插入单词
+    // 3. 插入单词
     const { data: newWord, error: wordError } = await supabase
       .from('words')
-      .insert({ ...dbWord, user_id: userId })
+      .insert({ 
+        ...dbWord, 
+        user_id: userId,
+        source_type: wordData.source_type,
+        source_word_id: wordData.source_word_id
+      })
       .select()
       .single();
 
@@ -290,7 +346,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: wordError.message }, { status: 500 });
     }
 
-    // 重置该单词的 is_excluded 标记（如果之前被排除过）
+    // 4. 重置该单词的 is_excluded 标记（如果之前被排除过）
     const { error: resetError } = await supabase
       .from('user_word_progress')
       .upsert({
@@ -307,7 +363,7 @@ export async function POST(request: NextRequest) {
       // 非致命错误，继续执行
     }
 
-    // 查找或创建"自定义单词本"
+    // 5. 查找或创建"自定义单词本"
     let { data: customBook } = await supabase
       .from('word_books')
       .select('id')
@@ -336,14 +392,16 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 将单词关联到自定义单词本
+    // 6. 将单词关联到自定义单词本
     if (customBook) {
       await supabase
         .from('word_book_items')
         .insert({
           word_book_id: customBook.id,
           word_id: newWord.id,
-          status: 'learning'
+          status: 'learning',
+          source_type: isFromDictionary ? 'dictionary' : 'word',
+          dictionary_id: dictWord?.id || null
         });
 
       // 更新单词书单词计数
@@ -358,7 +416,7 @@ export async function POST(request: NextRequest) {
         .eq('id', customBook.id);
     }
 
-    // 返回添加的单词（使用驼峰式字段名）
+    // 7. 返回添加的单词（使用驼峰式字段名）
     return NextResponse.json(mapWordFromDB(newWord), { status: 201 });
   } catch (error: any) {
     console.error('API error:', error);

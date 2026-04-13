@@ -74,6 +74,7 @@ export async function GET(request: NextRequest) {
 
 /**
  * 备用方案：使用多次查询（当 RPC 不存在时）
+ * 支持 dictionary 数据
  */
 async function fallbackGetReviewWords(userId: string, now: number, limit: number) {
   console.log('Using fallback method to fetch review words');
@@ -96,8 +97,8 @@ async function fallbackGetReviewWords(userId: string, now: number, limit: number
 
     const wordBookIds = learningSequences.map(seq => seq.word_book_id);
 
-    // 2. 获取这些单词书中的所有单词ID（分批）
-    let allWordIds: string[] = [];
+    // 2. 获取这些单词书中的所有条目（支持 word 和 dictionary 两种 source_type）
+    let allItems: { word_id?: string; dictionary_id?: string; source_type: string }[] = [];
     for (const bookId of wordBookIds) {
       let page = 0;
       const pageSize = 1000;
@@ -105,67 +106,168 @@ async function fallbackGetReviewWords(userId: string, now: number, limit: number
       while (true) {
         const { data: items, error: itemsError } = await supabase
           .from('word_book_items')
-          .select('word_id')
+          .select('word_id, dictionary_id, source_type')
           .eq('word_book_id', bookId)
           .range(page * pageSize, (page + 1) * pageSize - 1);
 
         if (itemsError || !items || items.length === 0) break;
         
-        allWordIds = allWordIds.concat(items.map(item => item.word_id));
+        allItems = allItems.concat(items);
         
         if (items.length < pageSize) break;
         page++;
       }
     }
 
-    if (allWordIds.length === 0) {
+    if (allItems.length === 0) {
       return NextResponse.json([]);
     }
 
-    // 3. 获取单词详情和进度记录（只获取必要的字段，排除 is_excluded = true 的）
-    const { data: words, error: wordsError } = await supabase
-      .from('words')
-      .select(`
-        id,
-        word,
-        phonetic,
-        meanings,
-        user_word_progress!inner(
-          interval,
-          ease_factor,
-          review_count,
-          next_review_at,
-          quality,
-          is_excluded
-        )
-      `)
-      .in('id', allWordIds.slice(0, 1000)) // 限制查询数量
-      .eq('user_word_progress.user_id', userId)
-      .lte('user_word_progress.next_review_at', now)
-      .or('user_word_progress.is_excluded.is.null,user_word_progress.is_excluded.eq.false', { foreignTable: 'user_word_progress' })
-      .order('user_word_progress.next_review_at', { ascending: true })
-      .limit(limit);
+    // 分离 word_id 和 dictionary_id
+    const wordIds = allItems
+      .filter(item => item.source_type === 'word' || !item.source_type)
+      .map(item => item.word_id)
+      .filter(Boolean) as string[];
+    
+    const dictionaryIds = allItems
+      .filter(item => item.source_type === 'dictionary')
+      .map(item => item.dictionary_id)
+      .filter(Boolean) as string[];
 
-    if (wordsError) {
-      console.error('Error fetching words:', wordsError);
-      return NextResponse.json({ error: wordsError.message }, { status: 500 });
+    // 3. 获取 words 表的单词详情
+    let wordDetails: any[] = [];
+    if (wordIds.length > 0) {
+      const { data: words, error: wordsError } = await supabase
+        .from('words')
+        .select(`
+          id,
+          word,
+          phonetic,
+          meanings
+        `)
+        .in('id', wordIds.slice(0, 1000));
+
+      if (wordsError) {
+        console.error('Error fetching words:', wordsError);
+      } else {
+        wordDetails = words || [];
+      }
     }
 
-    // 4. 转换为轻量级格式
-    const wordsForReview: WordForReview[] = (words || []).map((w: any) => ({
-      id: w.id,
-      word: w.word,
-      phonetic: w.phonetic,
-      chineseDefinition: extractChineseDefinition(w.meanings),
-      interval: w.user_word_progress?.[0]?.interval || 0,
-      easeFactor: w.user_word_progress?.[0]?.ease_factor || 2.5,
-      reviewCount: w.user_word_progress?.[0]?.review_count || 0,
-      nextReviewAt: w.user_word_progress?.[0]?.next_review_at || now,
-      quality: w.user_word_progress?.[0]?.quality || 0,
-    }));
+    // 4. 获取 dictionary 表的单词详情
+    let dictDetails: any[] = [];
+    if (dictionaryIds.length > 0) {
+      const { data: dicts, error: dictError } = await supabase
+        .from('dictionary')
+        .select('id, word, phonetic, translation')
+        .in('id', dictionaryIds.slice(0, 1000));
 
-    console.log(`Fallback: Fetched ${wordsForReview.length} words for review`);
-    return NextResponse.json(wordsForReview);
+      if (dictError) {
+        console.error('Error fetching dictionary:', dictError);
+      } else {
+        dictDetails = dicts || [];
+      }
+    }
+
+    // 5. 合并所有单词ID用于查询进度
+    const allWordIdsForProgress = [
+      ...wordIds,
+      ...dictionaryIds  // dictionary_id 也作为 word_id 存储在进度表中
+    ];
+
+    // 6. 获取进度记录（排除 is_excluded = true 的）
+    const { data: progressRecords, error: progressError } = await supabase
+      .from('user_word_progress')
+      .select('word_id, interval, ease_factor, review_count, next_review_at, quality, is_excluded')
+      .eq('user_id', userId)
+      .in('word_id', allWordIdsForProgress.slice(0, 1000))
+      .or('is_excluded.is.null,is_excluded.eq.false');
+
+    if (progressError) {
+      console.error('Error fetching progress:', progressError);
+    }
+
+    const progressMap = new Map();
+    (progressRecords || []).forEach((p: any) => {
+      progressMap.set(p.word_id, p);
+    });
+
+    // 7. 合并数据并过滤出需要复习的单词
+    const wordsForReview: WordForReview[] = [];
+
+    // 处理 words 表的单词
+    for (const w of wordDetails) {
+      const progress = progressMap.get(w.id);
+      const nextReviewAt = progress?.next_review_at || now;
+      const interval = progress?.interval || 0;
+      const isExcluded = progress?.is_excluded || false;
+
+      // 排除已标记为排除的单词
+      if (isExcluded) continue;
+
+      // 检查是否需要复习
+      const needsReview = !progress || 
+        (interval === 0 && nextReviewAt > now) || 
+        nextReviewAt <= now;
+
+      if (needsReview) {
+        wordsForReview.push({
+          id: w.id,
+          word: w.word,
+          phonetic: w.phonetic,
+          chineseDefinition: extractChineseDefinition(w.meanings),
+          interval: interval,
+          easeFactor: progress?.ease_factor || 2.5,
+          reviewCount: progress?.review_count || 0,
+          nextReviewAt: interval === 0 && nextReviewAt > now ? now : nextReviewAt,
+          quality: progress?.quality || 0,
+        });
+      }
+    }
+
+    // 处理 dictionary 表的单词
+    for (const d of dictDetails) {
+      const progress = progressMap.get(d.id);
+      const nextReviewAt = progress?.next_review_at || now;
+      const interval = progress?.interval || 0;
+      const isExcluded = progress?.is_excluded || false;
+
+      // 排除已标记为排除的单词
+      if (isExcluded) continue;
+
+      // 检查是否需要复习
+      const needsReview = !progress || 
+        (interval === 0 && nextReviewAt > now) || 
+        nextReviewAt <= now;
+
+      if (needsReview) {
+        wordsForReview.push({
+          id: d.id,
+          word: d.word,
+          phonetic: d.phonetic,
+          chineseDefinition: d.translation || '',
+          interval: interval,
+          easeFactor: progress?.ease_factor || 2.5,
+          reviewCount: progress?.review_count || 0,
+          nextReviewAt: interval === 0 && nextReviewAt > now ? now : nextReviewAt,
+          quality: progress?.quality || 0,
+        });
+      }
+    }
+
+    // 8. 排序并限制数量
+    // 优先返回 interval=0 的单词（新单词），然后按 next_review_at 排序
+    wordsForReview.sort((a, b) => {
+      const aIsNew = a.interval === 0 ? 0 : 1;
+      const bIsNew = b.interval === 0 ? 0 : 1;
+      if (aIsNew !== bIsNew) return aIsNew - bIsNew;
+      return a.nextReviewAt - b.nextReviewAt;
+    });
+
+    const limitedWords = wordsForReview.slice(0, limit);
+
+    console.log(`Fallback: Fetched ${limitedWords.length} words for review (${wordDetails.length} from words, ${dictDetails.length} from dictionary)`);
+    return NextResponse.json(limitedWords);
   } catch (error: any) {
     console.error('Fallback error:', error);
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
