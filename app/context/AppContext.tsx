@@ -70,24 +70,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [systemBooks, setSystemBooks] = useState<WordBook[]>([]);
 
   const refreshWords = useCallback(async () => {
-    if (!user) return;
+    if (!user?.id) return;
     try {
       const allWords = await fetchWords(user.id);
       setWords(allWords);
     } catch (error) {
       console.error('Error refreshing words:', error);
     }
-  }, [user]);
+  }, [user?.id]);
 
   const refreshContexts = useCallback(async () => {
-    if (!user) return;
+    if (!user?.id) return;
     try {
       const allContexts = await fetchContexts(user.id);
       setContexts(allContexts);
     } catch (error) {
       console.error('Error refreshing contexts:', error);
     }
-  }, [user]);
+  }, [user?.id]);
 
   const addWord = useCallback(async (word: Word) => {
     if (!user) return;
@@ -156,7 +156,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [user, refreshContexts]);
 
   const saveSettings = useCallback(async (newSettings: AppSettings) => {
-    if (!user) return;
+    if (!user?.id) return;
     try {
       await saveSettingsAPI(newSettings, user.id);
       setSettings(newSettings);
@@ -164,10 +164,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       console.error('Error saving settings:', error);
       throw error;
     }
-  }, [user]);
+  }, [user?.id]);
 
   const refreshWordBooks = useCallback(async () => {
-    if (!user) return;
+    if (!user?.id) return;
     try {
       const data = await fetchWordBooks(user.id);
       setSystemBooks(data.systemBooks);
@@ -176,10 +176,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Error refreshing wordbooks:', error);
     }
-  }, [user]);
+  }, [user?.id]);
 
   const addToSequence = useCallback(async (wordBookId: string, isPrimary = false) => {
-    if (!user) return;
+    if (!user?.id) return;
     try {
       await addToLearningSequence(user.id, wordBookId, isPrimary);
       await refreshWordBooks();
@@ -187,10 +187,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       console.error('Error adding to sequence:', error);
       throw error;
     }
-  }, [user, refreshWordBooks]);
+  }, [user?.id, refreshWordBooks]);
 
   const removeFromSequence = useCallback(async (wordBookId: string) => {
-    if (!user) return;
+    if (!user?.id) return;
     try {
       await removeFromLearningSequence(user.id, wordBookId);
       await refreshWordBooks();
@@ -198,10 +198,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       console.error('Error removing from sequence:', error);
       throw error;
     }
-  }, [user, refreshWordBooks]);
+  }, [user?.id, refreshWordBooks]);
 
   const setPrimaryBook = useCallback(async (wordBookId: string) => {
-    if (!user) return;
+    if (!user?.id) return;
     try {
       await setPrimaryWordBook(user.id, wordBookId);
       await saveSettings({ ...settings, primaryWordBookId: wordBookId });
@@ -210,10 +210,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       console.error('Error setting primary book:', error);
       throw error;
     }
-  }, [user, settings, saveSettings, refreshWordBooks]);
+  }, [user?.id, settings, saveSettings, refreshWordBooks]);
 
   const resetBook = useCallback(async (wordBookId: string) => {
-    if (!user) return;
+    if (!user?.id) return;
     try {
       await resetWordBook(wordBookId, user.id);
       await refreshWordBooks();
@@ -221,10 +221,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       console.error('Error resetting book:', error);
       throw error;
     }
-  }, [user, refreshWordBooks]);
+  }, [user?.id, refreshWordBooks]);
 
   const createBook = useCallback(async (name: string, description?: string) => {
-    if (!user) return;
+    if (!user?.id) return;
     try {
       await createWordBook(user.id, { name, description });
       await refreshWordBooks();
@@ -232,10 +232,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       console.error('Error creating book:', error);
       throw error;
     }
-  }, [user, refreshWordBooks]);
+  }, [user?.id, refreshWordBooks]);
 
   const deleteBook = useCallback(async (wordBookId: string) => {
-    if (!user) return;
+    if (!user?.id) return;
     try {
       await deleteWordBook(wordBookId, user.id);
       await refreshWordBooks();
@@ -243,7 +243,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       console.error('Error deleting book:', error);
       throw error;
     }
-  }, [user, refreshWordBooks]);
+  }, [user?.id, refreshWordBooks]);
 
   const toggleDarkMode = useCallback(async () => {
     const newDarkMode = !isDarkMode;
