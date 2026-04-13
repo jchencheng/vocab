@@ -595,6 +595,16 @@ export function Review() {
             <span className="font-medium">Complete blackout</span>
             <span className="font-medium">Perfect recall</span>
           </div>
+          {/* 显示答案后也显示删除按钮 */}
+          <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
+            <button
+              onClick={handleDelete}
+              className="w-full px-4 py-3 border-2 border-rose-300 dark:border-rose-700 text-rose-600 dark:text-rose-400 rounded-2xl font-semibold hover:bg-rose-50 dark:hover:bg-rose-900/30 transition-all shadow-soft flex items-center justify-center gap-2"
+            >
+              <span>🗑️</span>
+              <span>从复习队列删除</span>
+            </button>
+          </div>
         </div>
       )}
     </div>
