@@ -131,7 +131,7 @@ export async function POST(request: NextRequest) {
         // 使用 upsert 避免重复键问题，不需要预先查询
         console.log(`Preparing ${wordIds.length} progress records for user ${userId}`);
 
-        // 3. 准备所有进度记录（使用 upsert 会自动跳过已存在的）
+        // 3. 准备所有进度记录（使用 upsert 会自动更新已存在的，重置 is_excluded）
         const progressRecords = wordIds.map(wordId => ({
           user_id: userId,
           word_id: wordId,
@@ -139,10 +139,12 @@ export async function POST(request: NextRequest) {
           review_count: 0,
           ease_factor: 2.5,
           next_review_at: Date.now(), // 新单词立即可复习
-          quality: 0
+          quality: 0,
+          is_excluded: false // 重置排除标记
         }));
 
         // 4. 批量 upsert 进度记录（分批处理，每批1000个）
+        // 使用 upsert 更新所有记录，重置 is_excluded = false
         let successCount = 0;
         let errorCount = 0;
         
@@ -152,8 +154,8 @@ export async function POST(request: NextRequest) {
             const { error: upsertError } = await supabase
               .from('user_word_progress')
               .upsert(batch, {
-                onConflict: 'user_id,word_id',
-                ignoreDuplicates: true // 忽略重复键，不更新已有记录
+                onConflict: 'user_id,word_id'
+                // 不设置 ignoreDuplicates，这样已存在的记录会被更新（重置 is_excluded）
               });
 
             if (upsertError) {

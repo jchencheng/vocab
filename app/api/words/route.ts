@@ -290,6 +290,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: wordError.message }, { status: 500 });
     }
 
+    // 重置该单词的 is_excluded 标记（如果之前被排除过）
+    const { error: resetError } = await supabase
+      .from('user_word_progress')
+      .upsert({
+        user_id: userId,
+        word_id: newWord.id,
+        is_excluded: false,
+        updated_at: Date.now(),
+      }, {
+        onConflict: 'user_id,word_id'
+      });
+
+    if (resetError) {
+      console.error('Error resetting is_excluded:', resetError);
+      // 非致命错误，继续执行
+    }
+
     // 查找或创建"自定义单词本"
     let { data: customBook } = await supabase
       .from('word_books')
