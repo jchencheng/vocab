@@ -213,7 +213,9 @@ export function Review() {
 
     const updatedWord = calculateNextReview(currentWord, quality);
     const isLastWord = currentIndex >= queue.length - 1;
-    const newIndex = isLastWord ? currentIndex : currentIndex + 1;
+    
+    // 计算新的索引：如果是最后一个单词，保存 queue.length 表示已完成
+    const newIndex = isLastWord ? queue.length : currentIndex + 1;
     
     // 立即切换 UI
     if (isLastWord) {
@@ -235,7 +237,9 @@ export function Review() {
 
     const updatedWord = postponeToTomorrow(currentWord);
     const isLastWord = currentIndex >= queue.length - 1;
-    const newIndex = isLastWord ? currentIndex : currentIndex + 1;
+    
+    // 计算新的索引：如果是最后一个单词，保存 queue.length 表示已完成
+    const newIndex = isLastWord ? queue.length : currentIndex + 1;
 
     // 立即切换 UI
     if (isLastWord) {
@@ -261,7 +265,9 @@ export function Review() {
     }
 
     const isLastWord = currentIndex >= queue.length - 1;
-    const newIndex = isLastWord ? currentIndex : currentIndex + 1;
+    
+    // 计算新的索引：如果是最后一个单词，保存 queue.length 表示已完成
+    const newIndex = isLastWord ? queue.length : currentIndex + 1;
 
     // 立即从队列中移除
     setQueue(prev => prev.filter((_, idx) => idx !== currentIndex));
@@ -273,6 +279,9 @@ export function Review() {
       // 不增加 currentIndex，因为当前单词被删除了，后面的单词会自动前移
       setShowAnswer(false);
     }
+    
+    // 异步保存进度（删除也算完成一个单词）
+    saveProgress(newIndex).catch(console.error);
     
     // 异步删除单词
     try {
@@ -291,7 +300,7 @@ export function Review() {
     } catch (error) {
       console.error('Error deleting word:', error);
     }
-  }, [currentWord, currentIndex, queue.length, user?.id]);
+  }, [currentWord, currentIndex, queue.length, user?.id, saveProgress]);
 
   const handleRestart = useCallback(async () => {
     if (!user?.id) return;
