@@ -31,6 +31,7 @@ export function Review() {
   const [isComplete, setIsComplete] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [primaryBookWordIds, setPrimaryBookWordIds] = useState<Set<string>>(new Set());
+  const [isPrimaryBookLoaded, setIsPrimaryBookLoaded] = useState(false);
   
   // 使用 ref 来跟踪是否已经初始化
   const isInitializedRef = useRef(false);
@@ -44,6 +45,7 @@ export function Review() {
   useEffect(() => {
     if (!primaryWordBookId || studyMode === 'mixed') {
       setPrimaryBookWordIds(new Set());
+      setIsPrimaryBookLoaded(true); // 不需要加载，直接标记为完成
       return;
     }
 
@@ -57,6 +59,8 @@ export function Review() {
         }
       } catch (error) {
         console.error('Error fetching primary book words:', error);
+      } finally {
+        setIsPrimaryBookLoaded(true);
       }
     };
 
@@ -65,7 +69,8 @@ export function Review() {
 
   // 初始化复习队列（使用确定性随机）
   useEffect(() => {
-    if (isInitializedRef.current || !user?.id) {
+    // 等待用户加载完成，且主单词书加载完成（如果需要的话）
+    if (isInitializedRef.current || !user?.id || !isPrimaryBookLoaded) {
       return;
     }
 
@@ -168,7 +173,7 @@ export function Review() {
     };
 
     initReviewQueue();
-  }, [user?.id, primaryBookWordIds.size]);
+  }, [user?.id, isPrimaryBookLoaded]); // 只在用户和主单词书加载完成后执行
 
   // 保存当前索引到数据库
   const saveProgress = useCallback(async (newIndex: number) => {

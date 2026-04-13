@@ -2,14 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '../../../services/supabase';
 
 /**
- * GET /api/words/review/count?userId=xxx
+ * GET /api/words/review/count?userId=xxx&maxDailyReviews=50
  * 
- * 获取用户今天需要复习的单词数量
+ * 获取用户今天需要复习的单词数量（受 maxDailyReviews 限制）
  * 使用数据库函数 get_due_today_count 进行高效计数
  */
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const userId = searchParams.get('userId');
+  const maxDailyReviews = parseInt(searchParams.get('maxDailyReviews') || '50', 10);
 
   if (!userId) {
     return NextResponse.json({ error: 'userId is required' }, { status: 400 });
@@ -27,10 +28,15 @@ export async function GET(request: NextRequest) {
     if (error) {
       console.error('Error fetching due today count:', error);
       // 如果 RPC 不存在，使用备用方案
-      return await fallbackGetDueTodayCount(userId, now);
+      const result = await fallbackGetDueTodayCount(userId, now);
+      // 限制为 maxDailyReviews
+      const response = await result.json();
+      return NextResponse.json({ count: Math.min(response.count || 0, maxDailyReviews) });
     }
 
-    return NextResponse.json({ count: count || 0 });
+    // 限制为 maxDailyReviews
+    const limitedCount = Math.min(count || 0, maxDailyReviews);
+    return NextResponse.json({ count: limitedCount });
   } catch (error: any) {
     console.error('API error:', error);
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });

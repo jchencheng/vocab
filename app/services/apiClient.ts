@@ -119,10 +119,11 @@ export async function fetchWordsForReview(userId: string, limit: number = 100): 
 }
 
 /**
- * 获取今天需要复习的单词数量
+ * 获取今天需要复习的单词数量（受 maxDailyReviews 限制）
  */
-export async function fetchDueTodayCount(userId: string): Promise<number> {
-  const response = await fetchAPI(`${API_BASE_URL}/words/review/count?userId=${userId}`);
+export async function fetchDueTodayCount(userId: string, maxDailyReviews?: number): Promise<number> {
+  const maxParam = maxDailyReviews ? `&maxDailyReviews=${maxDailyReviews}` : '';
+  const response = await fetchAPI(`${API_BASE_URL}/words/review/count?userId=${userId}${maxParam}`);
   return response.count || 0;
 }
 

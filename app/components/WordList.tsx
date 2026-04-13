@@ -20,13 +20,15 @@ export function WordList() {
   const [currentPage, setCurrentPage] = useState(1);
   const [dueTodayCount, setDueTodayCount] = useState<number>(0);
 
-  // 从服务器获取准确的 Due Today 数量
+  // 从服务器获取准确的 Due Today 数量（受 maxDailyReviews 限制）
   useEffect(() => {
     if (!user?.id) return;
     
     const loadDueTodayCount = async () => {
       try {
-        const count = await fetchDueTodayCount(user.id);
+        // 从 settings 中获取 maxDailyReviews，默认为 50
+        const maxDailyReviews = 50; // 可以从全局设置获取
+        const count = await fetchDueTodayCount(user.id, maxDailyReviews);
         setDueTodayCount(count);
       } catch (error) {
         console.error('Error loading due today count:', error);
