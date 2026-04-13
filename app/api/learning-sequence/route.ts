@@ -134,7 +134,9 @@ export async function POST(request: NextRequest) {
               next_review_at: Date.now(),
               created_at: Date.now(),
               updated_at: Date.now(),
-              quality: 0
+              quality: 0,
+              source: 'wordbook',
+              source_wordbook_id: wordBookId
             }));
 
           // 4. 批量插入新单词
@@ -180,6 +182,7 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
+    // 1. 删除学习序列记录
     const { error } = await supabase
       .from('user_learning_sequences')
       .delete()
@@ -187,6 +190,26 @@ export async function DELETE(request: NextRequest) {
       .eq('word_book_id', wordBookId);
 
     if (error) throw error;
+
+    // 2. 删除从该单词书导入的单词（只删除 source='wordbook' 且 source_wordbook_id 匹配的单词）
+    // 用户手动添加的单词（source='manual' 或 null）不受影响
+    try {
+      const { error: deleteWordsError } = await supabase
+        .from('words')
+        .delete()
+        .eq('user_id', userId)
+        .eq('source', 'wordbook')
+        .eq('source_wordbook_id', wordBookId);
+
+      if (deleteWordsError) {
+        console.error('Error deleting words from wordbook:', deleteWordsError);
+      } else {
+        console.log(`Removed words from wordbook ${wordBookId} for user ${userId}`);
+      }
+    } catch (wordError) {
+      // 单词删除失败不应影响学习序列移除的成功
+      console.error('Error removing words from wordbook:', wordError);
+    }
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
