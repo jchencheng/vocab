@@ -72,10 +72,12 @@ export type SelectionMode = 'difficult' | 'mixed' | 'manual';
 
 // 单词检查结果
 export interface WordCheckResult {
-  userWord?: Word;      // 用户已添加的单词
-  builtinWord?: Word;   // 系统预置单词
+  userWord?: Word;           // 用户已添加的单词
+  builtinWord?: Word;        // 系统预置单词
+  dictionaryWord?: Word & { sourceType: 'dictionary' };  // 词典单词
   existsInUserLibrary: boolean;
   existsInBuiltin: boolean;
+  existsInDictionary: boolean;
 }
 
 // 添加单词请求
@@ -88,6 +90,7 @@ export interface AddWordRequest {
   useBuiltinMeanings?: boolean;
   originalWordId?: string;
   force?: boolean;
+  isFromDictionary?: boolean;
 }
 
 // 每日复习进度

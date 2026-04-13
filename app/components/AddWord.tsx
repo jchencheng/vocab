@@ -29,6 +29,10 @@ export function AddWord() {
   const [showBuiltinCard, setShowBuiltinCard] = useState(false);
   const [useBuiltinMeanings, setUseBuiltinMeanings] = useState(false);
   const [hasChecked, setHasChecked] = useState(false);
+  
+  // 词典词状态
+  const [isDictionaryWord, setIsDictionaryWord] = useState(false);
+  const [isFromDictionary, setIsFromDictionary] = useState(false);
 
   // 防抖定时器
   const checkTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -46,6 +50,11 @@ export function AddWord() {
     setUseBuiltinMeanings(false);
     setHasChecked(false);
     setModelMessage('');
+    setIsDictionaryWord(false);
+    setIsFromDictionary(false);
+    // 清空释义
+    setMeanings([]);
+    setPhonetic('');
 
     // 如果单词为空，不检查
     if (!word.trim() || !user) {
@@ -79,13 +88,22 @@ export function AddWord() {
       if (result.existsInUserLibrary) {
         // 单词已存在于用户词库，显示警告
         setModelMessage(`"${wordToCheck}" 已在您的词库中`);
+      } else if (result.existsInDictionary && result.dictionaryWord) {
+        // 单词存在于词典数据库，自动使用词典释义（不可编辑）
+        setIsDictionaryWord(true);
+        setIsFromDictionary(true);
+        setPhonetic(result.dictionaryWord.phonetic || '');
+        setMeanings(result.dictionaryWord.meanings);
+        setModelMessage(`"${wordToCheck}" 已存在于词典中，已自动加载释义（不可编辑）`);
       } else if (result.existsInBuiltin && result.builtinWord) {
         // 单词存在于系统词库，显示内置释义
         setShowBuiltinCard(true);
         setModelMessage(`"${wordToCheck}" 存在于系统词库，可使用内置释义`);
       } else {
-        // 单词不存在
-        setModelMessage(`"${wordToCheck}" 是新单词`);
+        // 单词不存在，支持自定义释义
+        setIsDictionaryWord(false);
+        setIsFromDictionary(false);
+        setModelMessage(`"${wordToCheck}" 是新单词，请添加自定义释义`);
       }
     } catch (err: any) {
       console.error('Error checking word:', err);
@@ -335,7 +353,8 @@ export function AddWord() {
         tags: parseTags(tags),
         userId: user.id,
         useBuiltinMeanings,
-        originalWordId: checkResult?.builtinWord?.id,
+        originalWordId: checkResult?.builtinWord?.id || checkResult?.dictionaryWord?.id,
+        isFromDictionary,
       });
 
       // 显示成功提示
@@ -470,37 +489,48 @@ export function AddWord() {
                   使用系统内置释义
                 </span>
               )}
+              {isFromDictionary && (
+                <span className="ml-2 text-sm font-normal text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                  词典释义（不可编辑）
+                </span>
+              )}
             </h3>
             <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={handleTranslateChinese}
-                disabled={isTranslating || meanings.length === 0}
-                className="px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm transition-colors"
-              >
-                {isTranslating ? 'Translating...' : 'Translate to Chinese'}
-              </button>
-              <button
-                type="button"
-                onClick={handleAddMeaning}
-                className="px-3 py-1 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm transition-colors"
-              >
-                Add Meaning
-              </button>
+              {!isFromDictionary && (
+                <>
+                  <button
+                    type="button"
+                    onClick={handleTranslateChinese}
+                    disabled={isTranslating || meanings.length === 0}
+                    className="px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm transition-colors"
+                  >
+                    {isTranslating ? 'Translating...' : 'Translate to Chinese'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleAddMeaning}
+                    className="px-3 py-1 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm transition-colors"
+                  >
+                    Add Meaning
+                  </button>
+                </>
+              )}
             </div>
           </div>
 
           {meanings.length === 0 ? (
             <div className="text-center py-8 text-gray-400">
               <p>暂无释义</p>
-              <p className="text-sm mt-1">点击 &quot;Add Meaning&quot; 添加，或直接提交空单词</p>
+              {!isFromDictionary && (
+                <p className="text-sm mt-1">点击 &quot;Add Meaning&quot; 添加，或直接提交空单词</p>
+              )}
             </div>
           ) : (
             <div className="space-y-6">
               {meanings.map((meaning, meaningIndex) => (
                 <div
                   key={meaningIndex}
-                  className="border border-gray-200 rounded-lg p-4 space-y-4"
+                  className={`border rounded-lg p-4 space-y-4 ${isFromDictionary ? 'border-blue-200 bg-blue-50/30' : 'border-gray-200'}`}
                 >
                   <div className="flex justify-between items-start">
                     <div className="flex-1 mr-4">
@@ -511,7 +541,7 @@ export function AddWord() {
                         type="text"
                         value={meaning.partOfSpeech}
                         onChange={(e) =>
-                          setMeanings(
+                          !isFromDictionary && setMeanings(
                             meanings.map((m, i) =>
                               i === meaningIndex
                                 ? { ...m, partOfSpeech: e.target.value }
@@ -519,11 +549,16 @@ export function AddWord() {
                             )
                           )
                         }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        disabled={isFromDictionary}
+                        className={`w-full px-3 py-2 border rounded-lg ${
+                          isFromDictionary 
+                            ? 'bg-gray-100 border-gray-200 text-gray-600 cursor-not-allowed' 
+                            : 'border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                        }`}
                         placeholder="noun, verb, adjective, etc."
                       />
                     </div>
-                    {meanings.length > 1 && (
+                    {meanings.length > 1 && !isFromDictionary && (
                       <button
                         type="button"
                         onClick={() => handleRemoveMeaning(meaningIndex)}
@@ -538,7 +573,7 @@ export function AddWord() {
                     {meaning.definitions.map((def, defIndex: number) => (
                       <div
                         key={defIndex}
-                        className="bg-gray-50 rounded-lg p-4 space-y-3"
+                        className={`rounded-lg p-4 space-y-3 ${isFromDictionary ? 'bg-blue-50/50' : 'bg-gray-50'}`}
                       >
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -547,7 +582,7 @@ export function AddWord() {
                           <textarea
                             value={def.definition}
                             onChange={(e) =>
-                              setMeanings(
+                              !isFromDictionary && setMeanings(
                                 meanings.map((m, mi) =>
                                   mi === meaningIndex
                                     ? {
@@ -562,7 +597,12 @@ export function AddWord() {
                                 )
                               )
                             }
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            disabled={isFromDictionary}
+                            className={`w-full px-3 py-2 border rounded-lg ${
+                              isFromDictionary 
+                                ? 'bg-gray-100 border-gray-200 text-gray-600 cursor-not-allowed' 
+                                : 'border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                            }`}
                             rows={2}
                             placeholder="Enter definition"
                           />
@@ -575,7 +615,7 @@ export function AddWord() {
                           <textarea
                             value={def.example}
                             onChange={(e) =>
-                              setMeanings(
+                              !isFromDictionary && setMeanings(
                                 meanings.map((m, mi) =>
                                   mi === meaningIndex
                                     ? {
@@ -590,7 +630,12 @@ export function AddWord() {
                                 )
                               )
                             }
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            disabled={isFromDictionary}
+                            className={`w-full px-3 py-2 border rounded-lg ${
+                              isFromDictionary 
+                                ? 'bg-gray-100 border-gray-200 text-gray-600 cursor-not-allowed' 
+                                : 'border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                            }`}
                             rows={2}
                             placeholder="Enter example sentence"
                           />
@@ -603,7 +648,7 @@ export function AddWord() {
                           <textarea
                             value={def.chineseDefinition}
                             onChange={(e) =>
-                              setMeanings(
+                              !isFromDictionary && setMeanings(
                                 meanings.map((m, mi) =>
                                   mi === meaningIndex
                                     ? {
@@ -618,13 +663,18 @@ export function AddWord() {
                                 )
                               )
                             }
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            disabled={isFromDictionary}
+                            className={`w-full px-3 py-2 border rounded-lg ${
+                              isFromDictionary 
+                                ? 'bg-gray-100 border-gray-200 text-gray-600 cursor-not-allowed' 
+                                : 'border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                            }`}
                             rows={2}
                             placeholder="输入中文释义"
                           />
                         </div>
 
-                        {meaning.definitions.length > 1 && (
+                        {meaning.definitions.length > 1 && !isFromDictionary && (
                           <button
                             type="button"
                             onClick={() =>

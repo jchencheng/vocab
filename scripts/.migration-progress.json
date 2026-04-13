@@ -1,0 +1,18 @@
+{
+  "builtinWords": {
+    "completed": false,
+    "lastIndex": 540,
+    "matched": 507,
+    "unmatched": 33
+  },
+  "userWords": {
+    "completed": false,
+    "lastIndex": 0,
+    "matched": 0
+  },
+  "wordBooks": {
+    "completed": false,
+    "lastIndex": 0,
+    "migrated": 0
+  }
+}
