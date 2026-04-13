@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
-import { calculateNextReview, shuffleWords, limitWords, postponeToTomorrow, postponeWithPriority } from '../utils/spacedRepetition';
+import { calculateNextReview, shuffleWords, limitWords, postponeToTomorrow, postponeWithPriority, getDueWords, getDueWordsByStudyMode } from '../utils/spacedRepetition';
 import { getIntervalText, getExampleSentence, getChineseDefinition, playAudio, hasAudio } from '../utils/wordUtils';
 import { fetchWordsForReview, WordForReview } from '../services/apiClient';
 import { QUALITY_LABELS } from '../constants';
@@ -89,7 +89,9 @@ export function Review() {
             partOfSpeech: '',
             definitions: [{
               definition: '',
-              chineseDefinition: rw.chineseDefinition
+              chineseDefinition: rw.chineseDefinition,
+              synonyms: [],
+              antonyms: []
             }],
             synonyms: [],
             antonyms: []
