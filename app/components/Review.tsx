@@ -141,9 +141,21 @@ export function Review() {
         // 4. 恢复进度或从头开始
         const startIndex = Math.min(savedIndex, limited.length);
         
-        setQueue(limited);
-        setCurrentIndex(startIndex);
-        setIsComplete(startIndex >= limited.length);
+        // 检查是否已经完成当天的复习
+        const isCompletedToday = startIndex >= limited.length;
+        
+        if (isCompletedToday) {
+          // 已经完成，设置空队列和完成状态
+          setQueue([]);
+          setCurrentIndex(0);
+          setIsComplete(true);
+          console.log('Review already completed today');
+        } else {
+          // 未完成，设置队列和进度
+          setQueue(limited);
+          setCurrentIndex(startIndex);
+          setIsComplete(false);
+        }
         
         // 如果没有进度记录，创建一个
         if (!progress) {
@@ -155,7 +167,7 @@ export function Review() {
           });
         }
         
-        console.log('Queue initialized - total:', limited.length, 'startIndex:', startIndex);
+        console.log('Queue initialized - total:', limited.length, 'startIndex:', startIndex, 'completed:', isCompletedToday);
       } catch (error) {
         console.error('Error initializing review queue:', error);
         fallbackInitReviewQueue();
