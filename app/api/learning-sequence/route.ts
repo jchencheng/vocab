@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
 }
 
 // POST /api/learning-sequence
-// 添加单词书到学习序列（不复制单词，单词通过动态查询获取）
+// 添加单词书到学习序列，并为该用户创建单词进度记录
 export async function POST(request: NextRequest) {
   try {
     const { userId, wordBookId, isPrimary = false } = await request.json();
@@ -91,6 +91,63 @@ export async function POST(request: NextRequest) {
       throw error;
     }
 
+    // 为单词书中的每个单词创建用户进度记录
+    try {
+      // 1. 获取单词书中的所有单词ID
+      const { data: bookItems, error: itemsError } = await supabase
+        .from('word_book_items')
+        .select('word_id')
+        .eq('word_book_id', wordBookId);
+
+      if (itemsError) {
+        console.error('Error fetching wordbook items:', itemsError);
+      } else if (bookItems && bookItems.length > 0) {
+        const wordIds = bookItems.map(item => item.word_id);
+
+        // 2. 检查用户已有哪些单词的进度记录
+        const { data: existingProgress, error: progressError } = await supabase
+          .from('user_word_progress')
+          .select('word_id')
+          .eq('user_id', userId)
+          .in('word_id', wordIds);
+
+        if (progressError) {
+          console.error('Error fetching existing progress:', progressError);
+        } else {
+          const existingWordIds = new Set(existingProgress?.map(p => p.word_id) || []);
+
+          // 3. 过滤出需要创建进度记录的单词
+          const newProgressRecords = wordIds
+            .filter(wordId => !existingWordIds.has(wordId))
+            .map(wordId => ({
+              user_id: userId,
+              word_id: wordId,
+              interval: 0,
+              review_count: 0,
+              ease_factor: 2.5,
+              next_review_at: Date.now(), // 新单词立即可复习
+              quality: 0
+            }));
+
+          // 4. 批量插入进度记录
+          if (newProgressRecords.length > 0) {
+            const { error: insertError } = await supabase
+              .from('user_word_progress')
+              .insert(newProgressRecords);
+
+            if (insertError) {
+              console.error('Error inserting word progress:', insertError);
+            } else {
+              console.log(`Created ${newProgressRecords.length} progress records for user ${userId}`);
+            }
+          }
+        }
+      }
+    } catch (progressError) {
+      // 进度记录创建失败不应影响学习序列添加的成功
+      console.error('Error creating word progress:', progressError);
+    }
+
     return NextResponse.json(data);
   } catch (error: any) {
     console.error('Error adding to learning sequence:', error);
@@ -102,7 +159,7 @@ export async function POST(request: NextRequest) {
 }
 
 // DELETE /api/learning-sequence?userId=xxx&wordBookId=xxx
-// 移除单词书 from 学习序列（单词不删除，通过动态查询自动排除）
+// 移除单词书 from 学习序列，并删除对应的单词进度记录
 export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -116,6 +173,7 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
+    // 1. 删除学习序列记录
     const { error } = await supabase
       .from('user_learning_sequences')
       .delete()
@@ -123,6 +181,37 @@ export async function DELETE(request: NextRequest) {
       .eq('word_book_id', wordBookId);
 
     if (error) throw error;
+
+    // 2. 删除该单词书对应的单词进度记录
+    try {
+      // 获取单词书中的所有单词ID
+      const { data: bookItems, error: itemsError } = await supabase
+        .from('word_book_items')
+        .select('word_id')
+        .eq('word_book_id', wordBookId);
+
+      if (itemsError) {
+        console.error('Error fetching wordbook items:', itemsError);
+      } else if (bookItems && bookItems.length > 0) {
+        const wordIds = bookItems.map(item => item.word_id);
+
+        // 删除这些单词的进度记录
+        const { error: deleteError } = await supabase
+          .from('user_word_progress')
+          .delete()
+          .eq('user_id', userId)
+          .in('word_id', wordIds);
+
+        if (deleteError) {
+          console.error('Error deleting word progress:', deleteError);
+        } else {
+          console.log(`Deleted progress records for wordbook ${wordBookId}, user ${userId}`);
+        }
+      }
+    } catch (progressError) {
+      // 进度记录删除失败不应影响学习序列移除的成功
+      console.error('Error deleting word progress:', progressError);
+    }
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

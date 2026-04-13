@@ -23,7 +23,7 @@ function mapWordToDB(word: any) {
 }
 
 // 将下划线式字段名转换为驼峰式（用于从数据库读取）
-function mapWordFromDB(dbWord: any) {
+function mapWordFromDB(dbWord: any, progress?: any): any {
   return {
     id: dbWord.id,
     word: dbWord.word,
@@ -32,18 +32,19 @@ function mapWordFromDB(dbWord: any) {
     meanings: dbWord.meanings || [],
     tags: dbWord.tags || [],
     customNote: dbWord.custom_note,
-    interval: dbWord.interval || 1,
-    easeFactor: dbWord.ease_factor || 2.5,
-    reviewCount: dbWord.review_count || 0,
-    nextReviewAt: dbWord.next_review_at || Date.now(),
-    createdAt: dbWord.created_at || Date.now(),
-    updatedAt: dbWord.updated_at || Date.now(),
-    quality: dbWord.quality || 0,
+    // 如果有进度记录，使用进度记录的值；否则使用默认值
+    interval: progress?.interval ?? dbWord.interval ?? 1,
+    easeFactor: progress?.ease_factor ?? dbWord.ease_factor ?? 2.5,
+    reviewCount: progress?.review_count ?? dbWord.review_count ?? 0,
+    nextReviewAt: progress?.next_review_at ?? dbWord.next_review_at ?? Date.now(),
+    createdAt: dbWord.created_at ?? Date.now(),
+    updatedAt: progress?.updated_at ?? dbWord.updated_at ?? Date.now(),
+    quality: progress?.quality ?? dbWord.quality ?? 0,
   };
 }
 
 // GET /api/words?userId=xxx
-// 返回用户手动添加的单词 + 用户学习序列中单词书的单词（不重复）
+// 返回用户手动添加的单词 + 用户学习序列中单词书的单词（包含复习进度）
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const userId = searchParams.get('userId');
@@ -75,8 +76,10 @@ export async function GET(request: NextRequest) {
       console.error('Error fetching learning sequences:', seqError);
     }
 
-    // 3. 获取学习序列中单词书的单词（系统单词，user_id 为 null）
+    // 3. 获取学习序列中单词书的单词
     let wordbookWords: any[] = [];
+    let wordbookProgress: Map<string, any> = new Map();
+    
     if (learningSequences && learningSequences.length > 0) {
       const wordBookIds = learningSequences.map(seq => seq.word_book_id);
       
@@ -84,6 +87,7 @@ export async function GET(request: NextRequest) {
       const { data: bookItems, error: itemsError } = await supabase
         .from('word_book_items')
         .select(`
+          word_id,
           word:words(*)
         `)
         .in('word_book_id', wordBookIds);
@@ -91,9 +95,28 @@ export async function GET(request: NextRequest) {
       if (itemsError) {
         console.error('Error fetching wordbook items:', itemsError);
       } else if (bookItems) {
+        const wordIds = bookItems.map((item: any) => item.word_id).filter(Boolean);
         wordbookWords = bookItems
           .map((item: any) => item.word)
           .filter((word: any) => word !== null);
+
+        // 获取这些单词的用户进度记录
+        if (wordIds.length > 0) {
+          const { data: progressData, error: progressError } = await supabase
+            .from('user_word_progress')
+            .select('*')
+            .eq('user_id', userId)
+            .in('word_id', wordIds);
+
+          if (progressError) {
+            console.error('Error fetching word progress:', progressError);
+          } else if (progressData) {
+            // 创建 word_id -> progress 的映射
+            progressData.forEach((p: any) => {
+              wordbookProgress.set(p.word_id, p);
+            });
+          }
+        }
       }
     }
 
@@ -105,14 +128,14 @@ export async function GET(request: NextRequest) {
       (word: any) => !userWordSet.has(word.word.toLowerCase())
     );
 
-    // 5. 合并并转换格式
-    const allWords = [
-      ...(userWords || []),
-      ...uniqueWordbookWords
-    ];
+    // 5. 合并并转换格式（单词书单词使用进度记录的状态）
+    const userWordsMapped = (userWords || []).map(w => mapWordFromDB(w));
+    const wordbookWordsMapped = uniqueWordbookWords.map((w: any) => 
+      mapWordFromDB(w, wordbookProgress.get(w.id))
+    );
 
-    const words = allWords.map(mapWordFromDB);
-    return NextResponse.json(words);
+    const allWords = [...userWordsMapped, ...wordbookWordsMapped];
+    return NextResponse.json(allWords);
   } catch (error: any) {
     console.error('API error:', error);
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
@@ -231,7 +254,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// PUT /api/words
+// PUT /api/words - 更新单词（包括复习进度）
 export async function PUT(request: NextRequest) {
   try {
     const { word, userId } = await request.json();
@@ -240,17 +263,52 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'word and userId are required' }, { status: 400 });
     }
 
-    const dbWord = mapWordToDB(word);
-
-    const { error } = await supabase
+    // 检查这是用户手动添加的单词还是单词书单词
+    const { data: wordData, error: wordError } = await supabase
       .from('words')
-      .update({ ...dbWord, user_id: userId })
+      .select('user_id')
       .eq('id', word.id)
-      .eq('user_id', userId);
+      .single();
 
-    if (error) {
-      console.error('Error updating word:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    if (wordError) {
+      console.error('Error fetching word:', wordError);
+      return NextResponse.json({ error: wordError.message }, { status: 500 });
+    }
+
+    if (wordData.user_id === userId) {
+      // 用户手动添加的单词 - 直接更新 words 表
+      const dbWord = mapWordToDB(word);
+      const { error } = await supabase
+        .from('words')
+        .update(dbWord)
+        .eq('id', word.id)
+        .eq('user_id', userId);
+
+      if (error) {
+        console.error('Error updating word:', error);
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+    } else {
+      // 单词书单词 - 更新 user_word_progress 表
+      const { error: progressError } = await supabase
+        .from('user_word_progress')
+        .upsert({
+          user_id: userId,
+          word_id: word.id,
+          interval: word.interval,
+          review_count: word.reviewCount,
+          ease_factor: word.easeFactor,
+          next_review_at: word.nextReviewAt,
+          quality: word.quality,
+          updated_at: Date.now()
+        }, {
+          onConflict: 'user_id,word_id'
+        });
+
+      if (progressError) {
+        console.error('Error updating word progress:', progressError);
+        return NextResponse.json({ error: progressError.message }, { status: 500 });
+      }
     }
 
     return NextResponse.json({ success: true });
