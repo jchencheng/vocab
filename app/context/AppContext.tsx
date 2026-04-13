@@ -271,14 +271,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     async function loadData() {
-      if (!isAuthenticated || !user) {
+      const userId = user?.id;
+      
+      if (!isAuthenticated || !userId) {
         setIsLoading(false);
         lastUserIdRef.current = null;
         return;
       }
 
       // 只有当用户真正变化时才重新加载数据
-      if (lastUserIdRef.current === user.id) {
+      if (lastUserIdRef.current === userId) {
         setIsLoading(false);
         return;
       }
@@ -286,14 +288,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       try {
         setIsLoading(true);
         // 优先加载设置，因为设置影响 UI 渲染
-        const savedSettings = await fetchSettings(user.id);
+        const savedSettings = await fetchSettings(userId);
         if (savedSettings) {
           setSettings(savedSettings);
           setIsDarkMode(savedSettings.darkMode || false);
         }
         // 并行加载单词、上下文和单词书数据
         await Promise.all([refreshWords(), refreshContexts(), refreshWordBooks()]);
-        lastUserIdRef.current = user.id;
+        lastUserIdRef.current = userId;
       } catch (error) {
         console.error('Error loading data:', error);
       } finally {
@@ -301,7 +303,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
     }
     loadData();
-  }, [isAuthenticated, user, refreshWords, refreshContexts, refreshWordBooks]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, user?.id]); // 只依赖 user?.id，不依赖 refresh 函数
 
   const value = useMemo(() => ({
     words,
