@@ -167,6 +167,11 @@ export function WordList() {
                           {word.phonetic}
                         </span>
                       )}
+                      {word.sourceType === 'dictionary' && (
+                        <span className="text-xs font-bold text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-800/50 px-2 py-0.5 rounded-full border border-blue-200 dark:border-blue-700">
+                          词典
+                        </span>
+                      )}
                     </div>
 
                     <p className="text-accent-600 dark:text-accent-400 text-base mb-2 line-clamp-2">

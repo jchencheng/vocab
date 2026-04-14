@@ -13,12 +13,16 @@ function convertTranslationToMeanings(translation: string): any[] {
     if (match) {
       meanings.push({
         partOfSpeech: match[1],
-        definitions: match[2].split(/[,;]/).map(d => d.trim()).filter(Boolean)
+        definitions: match[2].split(/[,;]/).map(d => d.trim()).filter(Boolean).map(def => ({
+          definition: def,
+        }))
       });
     } else if (part.trim()) {
       meanings.push({
         partOfSpeech: 'general',
-        definitions: part.split(/[,;]/).map(d => d.trim()).filter(Boolean)
+        definitions: part.split(/[,;]/).map(d => d.trim()).filter(Boolean).map(def => ({
+          definition: def,
+        }))
       });
     }
   }

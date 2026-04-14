@@ -151,6 +151,11 @@ export default function WordBookDetailPage() {
                               {word.phonetic}
                             </span>
                           )}
+                          {word.sourceType === 'dictionary' && (
+                            <span className="text-xs font-bold text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-800/50 px-2 py-0.5 rounded-full border border-blue-200 dark:border-blue-700">
+                              词典
+                            </span>
+                          )}
                         </div>
                         {word.meanings && word.meanings.length > 0 && (
                           <div className="mt-2 space-y-1">
