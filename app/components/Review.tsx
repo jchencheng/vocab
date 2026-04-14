@@ -55,7 +55,8 @@ export function Review() {
         const response = await fetch(`/api/wordbooks/${primaryWordBookId}/words?pageSize=10000`);
         if (response.ok) {
           const data = await response.json();
-          const wordIds = new Set<string>(data.items?.map((item: any) => item.word_id as string) || []);
+          // API 返回的是 data.words，每个单词的 id 字段就是 word_id
+          const wordIds = new Set<string>(data.words?.map((word: any) => word.id as string) || []);
           setPrimaryBookWordIds(wordIds);
         }
       } catch (error) {
