@@ -3,7 +3,8 @@
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { useEffect, useState } from 'react';
-import { supabase } from '../services/supabase';
+import { fetchWords } from '../services/apiClient';
+import type { Word } from '../types';
 
 interface DashboardStats {
   totalWords: number;
@@ -47,44 +48,29 @@ export function Dashboard({ onViewChange }: DashboardProps) {
       try {
         setIsLoading(true);
         const now = Date.now();
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const todayTimestamp = today.getTime();
 
-        // 获取统计数据
-        const { data: wordsData, error: wordsError } = await supabase
-          .from('words')
-          .select('id, word, interval, review_count, next_review_at, last_reviewed_at, created_at')
-          .eq('user_id', userId)
-          .order('created_at', { ascending: false });
-
-        if (wordsError) throw wordsError;
-
-        const words = wordsData || [];
-        const dueToday = words.filter(w => w.next_review_at <= now).length;
+        // 使用 API 客户端获取单词数据
+        const words = await fetchWords(userId);
+        
+        const dueToday = words.filter(w => w.nextReviewAt <= now).length;
         const mastered = words.filter(w => w.interval >= 30).length;
-        const learning = words.filter(w => w.interval < 30 && w.review_count > 0).length;
-        const completedToday = words.filter(
-          w => w.last_reviewed_at && w.last_reviewed_at >= todayTimestamp
-        ).length;
+        const learning = words.filter(w => w.interval < 30 && w.reviewCount > 0).length;
 
         // 获取最近添加的单词（限制10个）
-        const recent: RecentWord[] = words.slice(0, 10).map((w: any) => ({
+        const recent: RecentWord[] = words.slice(0, 10).map((w: Word) => ({
           id: w.id,
           word: w.word,
-          createdAt: w.created_at,
+          phonetic: w.phonetic,
+          createdAt: w.createdAt,
         }));
-
-        // 计算连续学习天数（简化版）
-        const streak = calculateStreak(words);
 
         setStats({
           totalWords: words.length,
           dueToday,
           mastered,
           learning,
-          completedToday,
-          streak,
+          completedToday: 0, // 暂时无法获取，需要额外的 API
+          streak: 0, // 暂时无法获取，需要额外的 API
         });
         setRecentWords(recent);
       } catch (error) {
@@ -96,35 +82,6 @@ export function Dashboard({ onViewChange }: DashboardProps) {
 
     loadDashboardData();
   }, [user?.id]);
-
-  function calculateStreak(words: any[]): number {
-    if (words.length === 0) return 0;
-    
-    const reviewDates = new Set<string>();
-    words.forEach(w => {
-      if (w.last_reviewed_at) {
-        const date = new Date(w.last_reviewed_at);
-        reviewDates.add(date.toDateString());
-      }
-    });
-
-    let streak = 0;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    for (let i = 0; i < 365; i++) {
-      const checkDate = new Date(today);
-      checkDate.setDate(checkDate.getDate() - i);
-      
-      if (reviewDates.has(checkDate.toDateString())) {
-        streak++;
-      } else if (i > 0) {
-        break;
-      }
-    }
-    
-    return streak;
-  }
 
   const dailyGoal = settings.maxDailyReviews || 20;
   const progressPercent = Math.min((stats.completedToday / dailyGoal) * 100, 100);
