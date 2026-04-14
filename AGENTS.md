@@ -19,4 +19,4 @@
 
 - web-design-guidelines
 
-#
+# supabase的相关配置不要使ANON\_KEY或者service\_role key，而是使用官方推荐的Publishable API keys或者Secret keys

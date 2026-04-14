@@ -2,12 +2,13 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Word, AppSettings, UserDailyProgress } from '../types';
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://bmvtpdofmnbrymosrwhy.supabase.co';
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+// 使用 Publishable API key (ANON_KEY) 替代 Service Role Key
+const SUPABASE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
-// 服务端 Supabase 客户端（使用 Service Role Key）
+// 服务端 Supabase 客户端（使用 Publishable Key / ANON_KEY）
 function getServerClient() {
-  return createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
+  return createClient(SUPABASE_URL || 'https://placeholder.supabase.co', SUPABASE_KEY || 'dummy-key-for-build', {
     auth: {
       persistSession: false,
     },

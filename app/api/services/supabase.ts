@@ -1,14 +1,15 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://bmvtpdofmnbrymosrwhy.supabase.co';
-const supabaseKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+// 使用 Publishable API key (ANON_KEY) 替代 Secret key
+const supabaseKey = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
-if (!supabaseKey) {
-  console.warn('SUPABASE_SECRET_KEY or SUPABASE_SERVICE_ROLE_KEY is not set. API will not work properly.');
+if (!supabaseUrl || !supabaseKey) {
+  console.warn('SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY must be set. API will not work properly.');
 }
 
-// 服务端 Supabase 配置 - 使用 Secret key 和 vocab_app schema
-export const supabase = createClient(supabaseUrl, supabaseKey || 'dummy-key-for-build', {
+// 服务端 Supabase 配置 - 使用 Publishable key (ANON_KEY) 和 vocab_app schema
+export const supabase = createClient(supabaseUrl || 'https://placeholder.supabase.co', supabaseKey || 'dummy-key-for-build', {
   db: {
     schema: 'vocab_app',
   },
