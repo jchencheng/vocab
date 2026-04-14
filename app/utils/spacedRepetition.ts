@@ -47,7 +47,9 @@ export function calculateNextReview(word: Word, quality: number): Word {
     easeFactor + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02))
   );
 
-  const nextReviewAt = Date.now() + interval * 24 * 60 * 60 * 1000;
+  // 使用当前时间作为基准，但确保一致性（以秒为单位）
+  const now = Math.floor(Date.now() / 1000) * 1000;
+  const nextReviewAt = now + interval * 24 * 60 * 60 * 1000;
 
   return {
     ...word,
@@ -56,7 +58,7 @@ export function calculateNextReview(word: Word, quality: number): Word {
     reviewCount,
     quality, // 保存评分质量
     nextReviewAt,
-    updatedAt: Date.now(),
+    updatedAt: now,
   };
 }
 

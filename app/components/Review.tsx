@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { calculateNextReview, shuffleWordsWithSeed, limitWords, postponeToTomorrow, postponeWithPriority, getDueWords, getDueWordsByStudyMode } from '../utils/spacedRepetition';
 import { getIntervalText, getExampleSentence, getChineseDefinition, playAudio, hasAudio } from '../utils/wordUtils';
 import { fetchWordsForReview, WordForReview, fetchDailyProgress, saveDailyProgress, updateDailyProgress } from '../services/apiClient';
+import { getReviewQueue, saveReviewQueue, updateReviewProgress } from '../services/reviewQueueCache';
 import type { Word } from '../types';
 
 type ReviewMode = 'en-to-cn' | 'cn-to-en';
@@ -67,7 +68,7 @@ export function Review() {
     fetchPrimaryBookWords();
   }, [primaryWordBookId, studyMode]);
 
-  // 初始化复习队列（使用确定性随机）
+  // 初始化复习队列（使用确定性随机 + 缓存）
   useEffect(() => {
     // 等待用户加载完成，且主单词书加载完成（如果需要的话）
     if (isInitializedRef.current || !user?.id || !isPrimaryBookLoaded) {
@@ -83,13 +84,46 @@ export function Review() {
         const today = getTodayString();
         const seed = `${user.id}-${today}`; // 使用用户ID+日期作为种子
         
-        // 1. 获取今天的复习进度（只读取 currentIndex）
+        // 1. 尝试从缓存获取复习队列（支持跨设备同步）
+        const cachedQueue = await getReviewQueue(
+          user.id,
+          today,
+          maxDailyReviews,
+          studyMode,
+          primaryWordBookId
+        );
+        
+        if (cachedQueue) {
+          console.log('Using cached review queue:', cachedQueue.queue.length);
+          
+          const startIndex = Math.min(cachedQueue.currentIndex, cachedQueue.queue.length);
+          const isCompletedToday = startIndex >= cachedQueue.queue.length;
+          
+          if (isCompletedToday) {
+            setQueue([]);
+            setCurrentIndex(0);
+            setIsComplete(true);
+            console.log('Review already completed today (from cache)');
+          } else {
+            setQueue(cachedQueue.queue);
+            setCurrentIndex(startIndex);
+            setIsComplete(false);
+          }
+          
+          setIsLoading(false);
+          return;
+        }
+        
+        // 2. 缓存未命中，生成新的复习队列
+        console.log('No cache found, generating new review queue');
+        
+        // 获取今天的复习进度
         const progress = await fetchDailyProgress(user.id, today);
         const savedIndex = progress?.currentIndex || 0;
         console.log('Saved progress index:', savedIndex);
 
-        // 2. 获取待复习单词列表
-        const reviewWords = await fetchWordsForReview(user.id, maxDailyReviews * 2);
+        // 获取待复习单词列表
+        const reviewWords = await fetchWordsForReview(user.id, maxDailyReviews);
         console.log('Fetched review words:', reviewWords.length);
 
         // 转换为 Word 类型，并按 ID 排序确保顺序一致
@@ -119,7 +153,7 @@ export function Review() {
             createdAt: Date.now(),
             updatedAt: Date.now()
           }))
-          .sort((a, b) => a.id.localeCompare(b.id)); // 按 ID 排序确保确定性顺序
+          .sort((a, b) => a.id.localeCompare(b.id));
 
         // 根据学习模式筛选
         let filteredWords = convertedWords;
@@ -134,28 +168,35 @@ export function Review() {
           }
         }
 
-        // 3. 使用确定性随机打乱（相同的种子产生相同的顺序）
+        // 使用确定性随机打乱
         const shuffled = shuffleWordsWithSeed(filteredWords, seed);
         const limited = limitWords(shuffled, maxDailyReviews);
 
-        // 4. 恢复进度或从头开始
+        // 恢复进度或从头开始
         const startIndex = Math.min(savedIndex, limited.length);
-        
-        // 检查是否已经完成当天的复习
         const isCompletedToday = startIndex >= limited.length;
         
         if (isCompletedToday) {
-          // 已经完成，设置空队列和完成状态
           setQueue([]);
           setCurrentIndex(0);
           setIsComplete(true);
           console.log('Review already completed today');
         } else {
-          // 未完成，设置队列和进度
           setQueue(limited);
           setCurrentIndex(startIndex);
           setIsComplete(false);
         }
+        
+        // 保存到缓存（本地 + 服务端）
+        await saveReviewQueue(
+          limited,
+          startIndex,
+          user.id,
+          today,
+          maxDailyReviews,
+          studyMode,
+          primaryWordBookId
+        );
         
         // 如果没有进度记录，创建一个
         if (!progress) {
@@ -187,23 +228,27 @@ export function Review() {
     };
 
     initReviewQueue();
-  }, [user?.id, isPrimaryBookLoaded]); // 只在用户和主单词书加载完成后执行
+  }, [user?.id, isPrimaryBookLoaded]);
 
-  // 保存当前索引到数据库（使用 upsert 确保记录存在）
+  // 保存当前索引到数据库和缓存（使用 upsert 确保记录存在）
   const saveProgress = useCallback(async (newIndex: number) => {
     if (!user?.id || isSavingRef.current) return;
     
     isSavingRef.current = true;
     try {
       const today = getTodayString();
-      // 使用 saveDailyProgress (upsert) 而不是 updateDailyProgress (update)
-      // 这样可以确保即使记录不存在也能保存成功
+      
+      // 保存到每日进度表
       await saveDailyProgress({
         userId: user.id,
         reviewDate: today,
         currentIndex: newIndex,
         maxDailyReviews,
       });
+      
+      // 更新缓存进度（支持跨设备同步）
+      await updateReviewProgress(user.id, today, newIndex);
+      
       console.log('Progress saved, index:', newIndex);
     } catch (error) {
       console.error('Error saving progress:', error);
