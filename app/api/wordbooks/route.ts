@@ -67,15 +67,28 @@ export async function GET(request: NextRequest) {
           const mastered = bookItems.filter((item: any) => item.status === 'mastered').length;
           const learning = bookItems.filter((item: any) => item.status === 'learning').length;
           const ignored = bookItems.filter((item: any) => item.status === 'ignored').length;
+          const newWords = bookItems.filter((item: any) => item.status === 'new' || !item.status).length;
           
           stats[bookId] = {
             total,
             mastered,
             learning,
             ignored,
+            new: newWords,
             progress: total > 0 ? Math.round((mastered / total) * 100) : 0
           };
         }
+      }
+    }
+
+    // 更新 word_books 表的 word_count 为实际数量
+    for (const bookId of allBookIds) {
+      const actualCount = stats[bookId]?.total || 0;
+      if (actualCount > 0) {
+        await supabase
+          .from('word_books')
+          .update({ word_count: actualCount })
+          .eq('id', bookId);
       }
     }
 
