@@ -17,26 +17,26 @@ export async function GET(request: NextRequest) {
       { data: learningSequence, error: sequenceError },
       { data: customBooks, error: customError }
     ] = await Promise.all([
-      // 获取系统预置单词书
+      // 获取系统预置单词书（包含计数字段）
       supabase
         .from('word_books')
-        .select('*')
+        .select('*, word_count, mastered_count, learning_count, new_count')
         .is('user_id', null)
         .eq('is_active', true),
       
-      // 获取用户学习序列
+      // 获取用户学习序列（包含计数字段）
       supabase
         .from('user_learning_sequences')
         .select(`
           *,
-          word_book:word_books(*)
+          word_book:word_books(*, word_count, mastered_count, learning_count, new_count)
         `)
         .eq('user_id', userId),
       
-      // 获取用户自建单词书
+      // 获取用户自建单词书（包含计数字段）
       supabase
         .from('word_books')
-        .select('*')
+        .select('*, word_count, mastered_count, learning_count, new_count')
         .eq('user_id', userId)
         .eq('source_type', 'custom')
     ]);
@@ -45,51 +45,35 @@ export async function GET(request: NextRequest) {
     if (sequenceError) throw sequenceError;
     if (customError) throw customError;
 
-    // 获取所有需要统计的单词书ID（系统书 + 学习序列中的书 + 自定义书）
-    const allBookIds = [
-      ...(systemBooks?.map((b: any) => b.id) || []),
-      ...(learningSequence?.map((item: any) => item.word_book?.id || item.word_book_id) || []),
-      ...(customBooks?.map((b: any) => b.id) || [])
-    ].filter(Boolean);
-
-    // 去重
-    const uniqueBookIds = [...new Set(allBookIds)];
-
+    // 构建 stats 对象（从 word_books 表的计数字段读取）
     const stats: Record<string, any> = {};
     
-    // 使用数据库函数获取统计，避免 1000 条查询限制
-    if (uniqueBookIds.length > 0) {
-      const { data: statsData, error: statsError } = await supabase
-        .rpc('get_wordbook_stats', { book_ids: uniqueBookIds });
-
-      if (!statsError && statsData) {
-        for (const row of statsData) {
-          const total = Number(row.total);
-          const mastered = Number(row.mastered);
-          stats[row.word_book_id] = {
-            total,
-            mastered,
-            learning: Number(row.learning),
-            ignored: Number(row.ignored),
-            new: Number(row.new_words),
-            progress: total > 0 ? Math.round((mastered / total) * 100) : 0
-          };
-        }
-      }
-      
-      // 为没有统计的书填充默认值
-      for (const bookId of uniqueBookIds) {
-        if (!stats[bookId]) {
-          stats[bookId] = {
-            total: 0,
-            mastered: 0,
-            learning: 0,
-            ignored: 0,
-            new: 0,
-            progress: 0
-          };
-        }
-      }
+    // 从 systemBooks 构建 stats
+    for (const book of (systemBooks || [])) {
+      const total = book.word_count || 0;
+      const mastered = book.mastered_count || 0;
+      stats[book.id] = {
+        total,
+        mastered,
+        learning: book.learning_count || 0,
+        ignored: book.ignored_count || 0,
+        new: book.new_count || 0,
+        progress: total > 0 ? Math.round((mastered / total) * 100) : 0
+      };
+    }
+    
+    // 从 customBooks 构建 stats
+    for (const book of (customBooks || [])) {
+      const total = book.word_count || 0;
+      const mastered = book.mastered_count || 0;
+      stats[book.id] = {
+        total,
+        mastered,
+        learning: book.learning_count || 0,
+        ignored: book.ignored_count || 0,
+        new: book.new_count || 0,
+        progress: total > 0 ? Math.round((mastered / total) * 100) : 0
+      };
     }
 
     return NextResponse.json({
@@ -127,7 +111,10 @@ export async function POST(request: NextRequest) {
         description,
         category,
         source_type: 'custom',
-        word_count: 0
+        word_count: 0,
+        mastered_count: 0,
+        learning_count: 0,
+        new_count: 0
       })
       .select()
       .single();
