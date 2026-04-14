@@ -16,6 +16,8 @@ export function Login() {
     setError('');
     setSuccessMessage('');
 
+    console.log('Login form submitted:', { email, isSignUp });
+
     if (!email || !password) {
       setError('Please enter both email and password');
       return;
@@ -27,7 +29,9 @@ export function Login() {
     }
 
     if (isSignUp) {
+      console.log('Calling signUp...');
       const { error, needsEmailConfirmation } = await signUp(email, password);
+      console.log('signUp result:', { error, needsEmailConfirmation });
       if (error) {
         setError(error.message);
       } else if (needsEmailConfirmation) {
@@ -37,9 +41,15 @@ export function Login() {
         setIsSignUp(false);
       }
     } else {
+      console.log('Calling signIn...');
       const { error } = await signIn(email, password);
+      console.log('signIn result:', { error });
       if (error) {
         setError(error.message);
+      } else {
+        console.log('Sign in successful, reloading page...');
+        // 登录成功后刷新页面，让服务端组件重新获取用户状态
+        window.location.reload();
       }
     }
   };
