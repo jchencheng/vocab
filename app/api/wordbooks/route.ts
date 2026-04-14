@@ -55,12 +55,17 @@ export async function GET(request: NextRequest) {
     const stats: Record<string, any> = {};
     
     if (allBookIds.length > 0) {
+      // 使用 RPC 或直接查询获取准确的统计
       const { data: itemsData, error: itemsError } = await supabase
         .from('word_book_items')
         .select('word_book_id, status')
         .in('word_book_id', allBookIds);
 
-      if (!itemsError && itemsData) {
+      if (itemsError) {
+        console.error('Error fetching word_book_items:', itemsError);
+      } else if (itemsData) {
+        console.log('Word book items data:', itemsData.length, 'items for books:', allBookIds);
+        
         for (const bookId of allBookIds) {
           const bookItems = itemsData.filter((item: any) => item.word_book_id === bookId);
           const total = bookItems.length;
