@@ -109,7 +109,7 @@ export function Review() {
             const unreviewedWords = finalQueue.slice(startIndex);
             
             // 根据新的学习模式重新排序未复习的单词
-            const reorderedUnreviewed = selectWordsByStudyMode(
+            const reorderedUnreviewed = getDueWordsByStudyMode(
               unreviewedWords,
               studyMode,
               primaryBookWordIds
