@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '../services/supabase';
 
+// 检查错误是否是函数不存在
+function isFunctionNotFoundError(error: any): boolean {
+  return error?.code === 'PGRST202' || 
+         error?.message?.includes('Could not find the function') ||
+         error?.message?.includes('does not exist');
+}
+
 /**
  * GET /api/review-queue?userId=xxx&date=YYYY-MM-DD
  * 
@@ -29,6 +36,14 @@ export async function GET(request: NextRequest) {
     });
 
     if (error) {
+      // 如果函数不存在，返回 501 让前端降级到本地缓存
+      if (isFunctionNotFoundError(error)) {
+        console.warn('RPC function not found, server cache not available');
+        return NextResponse.json(
+          { error: 'Server cache not implemented', code: 'NOT_IMPLEMENTED' },
+          { status: 501 }
+        );
+      }
       console.error('Error fetching review queue cache:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
@@ -75,6 +90,14 @@ export async function POST(request: NextRequest) {
     });
 
     if (error) {
+      // 如果函数不存在，返回 501 让前端降级到本地缓存
+      if (isFunctionNotFoundError(error)) {
+        console.warn('RPC function not found, server cache not available');
+        return NextResponse.json(
+          { error: 'Server cache not implemented', code: 'NOT_IMPLEMENTED' },
+          { status: 501 }
+        );
+      }
       console.error('Error saving review queue cache:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
@@ -109,6 +132,14 @@ export async function PUT(request: NextRequest) {
     });
 
     if (error) {
+      // 如果函数不存在，返回 501 让前端降级到本地缓存
+      if (isFunctionNotFoundError(error)) {
+        console.warn('RPC function not found, server cache not available');
+        return NextResponse.json(
+          { error: 'Server cache not implemented', code: 'NOT_IMPLEMENTED' },
+          { status: 501 }
+        );
+      }
       console.error('Error updating review queue progress:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }

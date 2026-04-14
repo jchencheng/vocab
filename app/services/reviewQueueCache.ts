@@ -104,6 +104,12 @@ export async function fetchServerCache(
     
     const response = await fetch(`/api/review-queue?${params}`);
     
+    // 如果服务端返回 501 (Not Implemented) 或 404，说明数据库函数不存在，优雅降级
+    if (response.status === 501 || response.status === 404) {
+      console.warn('Server cache not available, falling back to local cache');
+      return null;
+    }
+    
     if (!response.ok) {
       console.error('Error fetching server cache:', await response.text());
       return null;
@@ -140,6 +146,12 @@ export async function saveServerCache(cache: ReviewQueueCache): Promise<boolean>
       }),
     });
     
+    // 如果服务端返回 501 (Not Implemented) 或 404，说明数据库函数不存在，优雅降级
+    if (response.status === 501 || response.status === 404) {
+      console.warn('Server cache not available, falling back to local cache only');
+      return false;
+    }
+    
     return response.ok;
   } catch (error) {
     console.error('Error saving server cache:', error);
@@ -165,6 +177,12 @@ export async function updateServerProgress(
         currentIndex,
       }),
     });
+    
+    // 如果服务端返回 501 (Not Implemented) 或 404，说明数据库函数不存在，优雅降级
+    if (response.status === 501 || response.status === 404) {
+      console.warn('Server progress update not available, using local cache only');
+      return false;
+    }
     
     return response.ok;
   } catch (error) {
