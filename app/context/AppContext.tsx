@@ -300,9 +300,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setSettings(savedSettings);
           setIsDarkMode(savedSettings.darkMode || false);
         }
-        // 首页只加载上下文和单词书数据，不加载所有单词
+        // C方案: 按需加载 - 首页只加载单词书数据
+        // Contexts (AI上下文) 延迟到 AI Memory 页面加载
         // 单词列表在 WordList 组件挂载时按需加载
-        await Promise.all([refreshContexts(), refreshWordBooks()]);
+        await refreshWordBooks();
         lastUserIdRef.current = userId;
       } catch (error) {
         console.error('Error loading data:', error);

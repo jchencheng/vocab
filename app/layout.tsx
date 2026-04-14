@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { AuthProvider } from './context/AuthContext';
 import { AppProvider } from './context/AppContext';
+import { SWRProvider } from './components/SWRProvider';
 
 export const metadata: Metadata = {
   title: 'Vocab Master',
@@ -24,7 +25,9 @@ export default function RootLayout({
         <div className="grain-overlay" />
         <AuthProvider>
           <AppProvider>
-            {children}
+            <SWRProvider>
+              {children}
+            </SWRProvider>
           </AppProvider>
         </AuthProvider>
       </body>
