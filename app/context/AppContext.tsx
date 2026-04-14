@@ -178,28 +178,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setSystemBooks(data.systemBooks);
       setLearningSequence(data.learningSequence);
       
-      // 合并学习序列中的单词书和自定义单词书，并添加 stats 中的 wordCount
+      // 给所有类型的单词书添加 stats 中的统计信息
+      const addStatsToBook = (book: any) => {
+        const bookStats = data.stats?.[book.id];
+        return {
+          ...book,
+          wordCount: bookStats?.total || 0,
+          masteredCount: bookStats?.mastered || 0,
+          learningCount: bookStats?.learning || 0,
+        };
+      };
+      
+      // 学习序列中的单词书
       const booksFromSequence = data.learningSequence.map((item: any) => {
         const book = item.word_book!;
-        const bookStats = data.stats?.[book.id];
-        return {
-          ...book,
-          wordCount: bookStats?.total || 0,
-          masteredCount: bookStats?.mastered || 0,
-          learningCount: bookStats?.learning || 0,
-        };
+        return addStatsToBook(book);
       }).filter(Boolean);
       
-      const customBooksWithStats = data.customBooks.map((book: any) => {
-        const bookStats = data.stats?.[book.id];
-        return {
-          ...book,
-          wordCount: bookStats?.total || 0,
-          masteredCount: bookStats?.mastered || 0,
-          learningCount: bookStats?.learning || 0,
-        };
-      });
+      // 自定义单词书
+      const customBooksWithStats = data.customBooks.map(addStatsToBook);
       
+      // 系统单词书（也添加 stats）
+      const systemBooksWithStats = data.systemBooks.map(addStatsToBook);
+      
+      setSystemBooks(systemBooksWithStats);
       setWordBooks([...booksFromSequence, ...customBooksWithStats]);
     } catch (error) {
       console.error('Error refreshing wordbooks:', error);

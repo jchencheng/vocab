@@ -250,6 +250,7 @@ export function WordBookList() {
               <WordBookCard
                 key={book.id}
                 book={book}
+                stats={bookStats[book.id]}
                 inSequence={false}
                 onAddToSequence={() => handleAddToSequence(book.id)}
                 onViewDetail={() => router.push(`/wordbooks/${book.id}`)}

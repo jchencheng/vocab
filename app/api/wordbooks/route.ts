@@ -45,21 +45,23 @@ export async function GET(request: NextRequest) {
     if (sequenceError) throw sequenceError;
     if (customError) throw customError;
 
-    // 获取学习序列中每本书的真实统计
-    const bookIds = learningSequence?.map((item: any) => 
-      item.word_book?.id || item.word_book_id
-    ).filter(Boolean) || [];
+    // 获取所有需要统计的单词书ID（系统书 + 学习序列中的书 + 自定义书）
+    const allBookIds = [
+      ...(systemBooks?.map((b: any) => b.id) || []),
+      ...(learningSequence?.map((item: any) => item.word_book?.id || item.word_book_id) || []),
+      ...(customBooks?.map((b: any) => b.id) || [])
+    ].filter(Boolean);
 
     const stats: Record<string, any> = {};
     
-    if (bookIds.length > 0) {
+    if (allBookIds.length > 0) {
       const { data: itemsData, error: itemsError } = await supabase
         .from('word_book_items')
         .select('word_book_id, status')
-        .in('word_book_id', bookIds);
+        .in('word_book_id', allBookIds);
 
       if (!itemsError && itemsData) {
-        for (const bookId of bookIds) {
+        for (const bookId of allBookIds) {
           const bookItems = itemsData.filter((item: any) => item.word_book_id === bookId);
           const total = bookItems.length;
           const mastered = bookItems.filter((item: any) => item.status === 'mastered').length;
