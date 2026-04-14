@@ -36,9 +36,9 @@ function mapWordFromDB(dbWord: any, dictData?: any, isFromDict: boolean = false)
   const word = dbWord || {};
   const dict = dictData || {};
   
-  // 优先使用 dictionary 的 phonetic 和 translation
-  const phonetic = dict.phonetic || word.phonetic;
-  const meanings = dict.translation 
+  // 只有词典词才使用 dictionary 的 phonetic 和 translation
+  const phonetic = isFromDict ? (dict.phonetic || word.phonetic) : word.phonetic;
+  const meanings = isFromDict && dict.translation 
     ? convertTranslationToMeanings(dict.translation)
     : (word.meanings || []);
   
