@@ -131,7 +131,9 @@ export function WordBookList() {
   };
 
   // 获取学习序列中的单词书 ID 集合
-  const sequenceBookIds = new Set(learningSequence.map((item: any) => item.word_book_id || item.wordBookId));
+  const sequenceBookIds = new Set(learningSequence.map((item: any) => 
+    item.word_book?.id || item.wordBookId || item.word_book_id
+  ));
 
   // 过滤出未添加的系统单词书
   const availableSystemBooks = systemBooks.filter(book => !sequenceBookIds.has(book.id));
@@ -146,6 +148,9 @@ export function WordBookList() {
       isPrimary: item.is_primary || item.isPrimary
     };
   });
+
+  // 过滤出未添加到学习序列的自定义单词书
+  const availableCustomBooks = customBooks.filter(book => !sequenceBookIds.has(book.id));
 
   if (isLoading) {
     return (
@@ -212,6 +217,27 @@ export function WordBookList() {
           </div>
         )}
       </section>
+
+      {/* 自定义单词书（未添加到学习序列的） */}
+      {availableCustomBooks.length > 0 && (
+        <section className="mb-10">
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
+            我的自定义单词书
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {availableCustomBooks.map((book) => (
+              <WordBookCard
+                key={book.id}
+                book={book}
+                stats={bookStats[book.id]}
+                inSequence={false}
+                onAddToSequence={() => handleAddToSequence(book.id)}
+                onViewDetail={() => router.push(`/wordbooks/${book.id}`)}
+              />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* 系统单词书 */}
       {availableSystemBooks.length > 0 && (
