@@ -81,7 +81,7 @@ export async function GET(
       );
     }
 
-    // 先获取总数
+    // 先获取总数（只计数，不获取数据）
     let countQuery = supabase
       .from('word_book_items')
       .select('*', { count: 'exact', head: true })
@@ -95,13 +95,28 @@ export async function GET(
 
     if (countError) throw countError;
 
-    // 获取单词列表（支持 word 和 dictionary 两种 source_type）
+    // 优化：只选择必要的字段，减少数据传输
     let query = supabase
       .from('word_book_items')
       .select(`
-        *,
-        word:words(*),
-        dictionary:dictionary(*)
+        id,
+        source_type,
+        dictionary_id,
+        added_at,
+        status,
+        word:words(
+          id,
+          word,
+          phonetic,
+          meanings,
+          source_type
+        ),
+        dictionary:dictionary(
+          id,
+          word,
+          phonetic,
+          translation
+        )
       `)
       .eq('word_book_id', params.id);
 

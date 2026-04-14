@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '../../context/AuthContext';
 import { fetchWordBookDetail, fetchWordBookWords } from '../../services/wordbookAPI';
+import { WordbookDetailSkeleton } from '../../components/WordbookSkeleton';
 import type { WordBook, Word } from '../../types';
 
 const WORDS_PER_PAGE = 20;
@@ -75,11 +76,7 @@ export default function WordBookDetailPage() {
   };
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-200 border-t-blue-600"></div>
-      </div>
-    );
+    return <WordbookDetailSkeleton />;
   }
 
   if (error || !book) {
