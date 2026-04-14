@@ -57,28 +57,38 @@ export async function GET(request: NextRequest) {
 
     const stats: Record<string, any> = {};
     
-    // 为每本书单独查询统计，避免 1000 条限制
-    for (const bookId of uniqueBookIds) {
-      const { data: itemsData, error: itemsError } = await supabase
-        .from('word_book_items')
-        .select('status')
-        .eq('word_book_id', bookId);
+    // 使用数据库函数获取统计，避免 1000 条查询限制
+    if (uniqueBookIds.length > 0) {
+      const { data: statsData, error: statsError } = await supabase
+        .rpc('get_wordbook_stats', { book_ids: uniqueBookIds });
 
-      if (!itemsError && itemsData) {
-        const total = itemsData.length;
-        const mastered = itemsData.filter((item: any) => item.status === 'mastered').length;
-        const learning = itemsData.filter((item: any) => item.status === 'learning').length;
-        const ignored = itemsData.filter((item: any) => item.status === 'ignored').length;
-        const newWords = itemsData.filter((item: any) => item.status === 'new' || !item.status).length;
-        
-        stats[bookId] = {
-          total,
-          mastered,
-          learning,
-          ignored,
-          new: newWords,
-          progress: total > 0 ? Math.round((mastered / total) * 100) : 0
-        };
+      if (!statsError && statsData) {
+        for (const row of statsData) {
+          const total = Number(row.total);
+          const mastered = Number(row.mastered);
+          stats[row.word_book_id] = {
+            total,
+            mastered,
+            learning: Number(row.learning),
+            ignored: Number(row.ignored),
+            new: Number(row.new_words),
+            progress: total > 0 ? Math.round((mastered / total) * 100) : 0
+          };
+        }
+      }
+      
+      // 为没有统计的书填充默认值
+      for (const bookId of uniqueBookIds) {
+        if (!stats[bookId]) {
+          stats[bookId] = {
+            total: 0,
+            mastered: 0,
+            learning: 0,
+            ignored: 0,
+            new: 0,
+            progress: 0
+          };
+        }
       }
     }
 
