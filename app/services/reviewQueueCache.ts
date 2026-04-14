@@ -206,7 +206,7 @@ export async function getReviewQueue(
   maxDailyReviews: number,
   studyMode: string,
   primaryWordBookId?: string | null
-): Promise<{ queue: Word[]; currentIndex: number; fromCache: boolean } | null> {
+): Promise<{ queue: Word[]; currentIndex: number; fromCache: boolean; paramsChanged?: boolean } | null> {
   // 1. 检查本地缓存
   const localCache = getLocalCache(userId, date);
   
@@ -223,6 +223,17 @@ export async function getReviewQueue(
         queue: localCache.queue,
         currentIndex: localCache.currentIndex,
         fromCache: true,
+      };
+    }
+    
+    // 参数不匹配但缓存存在（学习模式切换），保留进度但标记参数变化
+    if (localCache.queue.length > 0) {
+      console.log('Study mode changed, preserving progress but will regenerate queue');
+      return {
+        queue: localCache.queue,
+        currentIndex: localCache.currentIndex,
+        fromCache: true,
+        paramsChanged: true,
       };
     }
   }

@@ -95,10 +95,34 @@ export function Review() {
         );
         
         if (cachedQueue) {
-          console.log('Using cached review queue:', cachedQueue.queue.length);
+          console.log('Using cached review queue:', cachedQueue.queue.length, 'paramsChanged:', cachedQueue.paramsChanged);
           
-          const startIndex = Math.min(cachedQueue.currentIndex, cachedQueue.queue.length);
-          const isCompletedToday = startIndex >= cachedQueue.queue.length;
+          let finalQueue = cachedQueue.queue;
+          let startIndex = Math.min(cachedQueue.currentIndex, cachedQueue.queue.length);
+          
+          // 如果参数变化（学习模式切换），根据新模式重新筛选/排序队列
+          if (cachedQueue.paramsChanged && primaryBookWordIds.size > 0) {
+            console.log('Reordering queue based on new study mode:', studyMode);
+            
+            // 分离已复习和未复习的单词
+            const reviewedWords = finalQueue.slice(0, startIndex);
+            const unreviewedWords = finalQueue.slice(startIndex);
+            
+            // 根据新的学习模式重新排序未复习的单词
+            const reorderedUnreviewed = selectWordsByStudyMode(
+              unreviewedWords,
+              studyMode,
+              primaryBookWordIds
+            );
+            
+            // 合并：已复习的单词 + 重新排序的未复习单词
+            finalQueue = [...reviewedWords, ...reorderedUnreviewed];
+            
+            // 保存新的队列到缓存
+            await saveReviewQueue(finalQueue, startIndex, user.id, today, maxDailyReviews, studyMode, primaryWordBookId);
+          }
+          
+          const isCompletedToday = startIndex >= finalQueue.length;
           
           if (isCompletedToday) {
             setQueue([]);
@@ -106,7 +130,7 @@ export function Review() {
             setIsComplete(true);
             console.log('Review already completed today (from cache)');
           } else {
-            setQueue(cachedQueue.queue);
+            setQueue(finalQueue);
             setCurrentIndex(startIndex);
             setIsComplete(false);
           }
