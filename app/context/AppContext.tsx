@@ -31,6 +31,7 @@ interface AppContextType {
   contexts: AIContext[];
   settings: AppSettings;
   isLoading: boolean;
+  isWordsLoading: boolean;
   refreshWords: () => Promise<void>;
   refreshContexts: () => Promise<void>;
   addWord: (word: Word) => Promise<void>;
@@ -63,6 +64,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [contexts, setContexts] = useState<AIContext[]>([]);
   const [settings, setSettings] = useState<AppSettings>({});
   const [isLoading, setIsLoading] = useState(true);
+  const [isWordsLoading, setIsWordsLoading] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const lastUserIdRef = useRef<string | null>(null);
   const [wordBooks, setWordBooks] = useState<WordBook[]>([]);
@@ -72,10 +74,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const refreshWords = useCallback(async () => {
     if (!user?.id) return;
     try {
+      setIsWordsLoading(true);
       const allWords = await fetchWords(user.id);
       setWords(allWords);
     } catch (error) {
       console.error('Error refreshing words:', error);
+    } finally {
+      setIsWordsLoading(false);
     }
   }, [user?.id]);
 
@@ -295,8 +300,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setSettings(savedSettings);
           setIsDarkMode(savedSettings.darkMode || false);
         }
-        // 并行加载单词、上下文和单词书数据
-        await Promise.all([refreshWords(), refreshContexts(), refreshWordBooks()]);
+        // 首页只加载上下文和单词书数据，不加载所有单词
+        // 单词列表在 WordList 组件挂载时按需加载
+        await Promise.all([refreshContexts(), refreshWordBooks()]);
         lastUserIdRef.current = userId;
       } catch (error) {
         console.error('Error loading data:', error);
@@ -313,6 +319,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     contexts,
     settings,
     isLoading,
+    isWordsLoading,
     refreshWords,
     refreshContexts,
     addWord,
@@ -340,6 +347,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     contexts,
     settings,
     isLoading,
+    isWordsLoading,
     refreshWords,
     refreshContexts,
     addWord,

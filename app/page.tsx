@@ -4,20 +4,32 @@ import { useAuth } from './context/AuthContext';
 import { useApp } from './context/AppContext';
 import { Login } from './components/Login';
 import { Navbar } from './components/Navbar';
-import { WordList } from './components/WordList';
-import { AddWord } from './components/AddWord';
-import { WordBookList } from './components/WordBookList';
-import { Review } from './components/Review';
-import { Settings } from './components/Settings';
-import { AIMemory } from './components/AIMemory';
-import { useState } from 'react';
+import { Dashboard } from './components/Dashboard';
+import { Suspense, lazy, useState } from 'react';
 
-type View = 'list' | 'add' | 'wordbooks' | 'review' | 'settings' | 'ai-memory';
+// 懒加载其他页面组件
+const WordList = lazy(() => import('./components/WordList').then(m => ({ default: m.WordList })));
+const AddWord = lazy(() => import('./components/AddWord').then(m => ({ default: m.AddWord })));
+const WordBookList = lazy(() => import('./components/WordBookList').then(m => ({ default: m.WordBookList })));
+const Review = lazy(() => import('./components/Review').then(m => ({ default: m.Review })));
+const Settings = lazy(() => import('./components/Settings').then(m => ({ default: m.Settings })));
+const AIMemory = lazy(() => import('./components/AIMemory').then(m => ({ default: m.AIMemory })));
+
+// 页面加载骨架屏
+function PageSkeleton() {
+  return (
+    <div className="flex items-center justify-center py-20">
+      <div className="animate-spin rounded-full h-10 w-10 border-3 border-primary-200 border-t-primary-600"></div>
+    </div>
+  );
+}
+
+type View = 'home' | 'list' | 'add' | 'wordbooks' | 'review' | 'settings' | 'ai-memory';
 
 export default function Home() {
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
   const { isLoading: isAppLoading } = useApp();
-  const [currentView, setCurrentView] = useState<View>('list');
+  const [currentView, setCurrentView] = useState<View>('home');
 
   if (isAuthLoading || isAppLoading) {
     return (
@@ -36,12 +48,37 @@ export default function Home() {
       <Navbar currentView={currentView} onViewChange={setCurrentView} />
       <main className="container mx-auto px-4 py-8">
         <div className="animate-fade-in">
-          {currentView === 'list' && <WordList />}
-          {currentView === 'add' && <AddWord />}
-          {currentView === 'wordbooks' && <WordBookList />}
-          {currentView === 'review' && <Review />}
-          {currentView === 'settings' && <Settings />}
-          {currentView === 'ai-memory' && <AIMemory />}
+          {currentView === 'home' && <Dashboard onViewChange={setCurrentView} />}
+          {currentView === 'list' && (
+            <Suspense fallback={<PageSkeleton />}>
+              <WordList />
+            </Suspense>
+          )}
+          {currentView === 'add' && (
+            <Suspense fallback={<PageSkeleton />}>
+              <AddWord />
+            </Suspense>
+          )}
+          {currentView === 'wordbooks' && (
+            <Suspense fallback={<PageSkeleton />}>
+              <WordBookList />
+            </Suspense>
+          )}
+          {currentView === 'review' && (
+            <Suspense fallback={<PageSkeleton />}>
+              <Review />
+            </Suspense>
+          )}
+          {currentView === 'settings' && (
+            <Suspense fallback={<PageSkeleton />}>
+              <Settings />
+            </Suspense>
+          )}
+          {currentView === 'ai-memory' && (
+            <Suspense fallback={<PageSkeleton />}>
+              <AIMemory />
+            </Suspense>
+          )}
         </div>
       </main>
     </div>

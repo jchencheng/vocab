@@ -12,7 +12,7 @@ import type { Word } from '../types';
 const ITEMS_PER_PAGE = 10;
 
 export function WordList() {
-  const { words, isLoading, deleteWord } = useApp();
+  const { words, isWordsLoading, refreshWords, deleteWord } = useApp();
   const { user } = useAuth();
   const [selectedWord, setSelectedWord] = useState<Word | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -20,10 +20,16 @@ export function WordList() {
   const [currentPage, setCurrentPage] = useState(1);
   const [dueTodayCount, setDueTodayCount] = useState<number>(0);
 
+  // 组件挂载时加载单词
+  useEffect(() => {
+    if (!user?.id) return;
+    refreshWords();
+  }, [user?.id, refreshWords]);
+
   // 从服务器获取准确的 Due Today 数量（受 maxDailyReviews 限制）
   useEffect(() => {
     if (!user?.id) return;
-    
+
     const loadDueTodayCount = async () => {
       try {
         // 从 settings 中获取 maxDailyReviews，默认为 50
@@ -34,7 +40,7 @@ export function WordList() {
         console.error('Error loading due today count:', error);
       }
     };
-    
+
     loadDueTodayCount();
   }, [user?.id, words]); // 当用户或单词列表变化时重新获取
 
@@ -70,7 +76,7 @@ export function WordList() {
     setCurrentPage(1);
   };
 
-  if (isLoading) {
+  if (isWordsLoading) {
     return (
       <div className="flex items-center justify-center py-20">
         <div className="animate-spin rounded-full h-10 w-10 border-3 border-primary-200 border-t-primary-600"></div>

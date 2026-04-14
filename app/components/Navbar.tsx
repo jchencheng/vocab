@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
 import { useState } from 'react';
 
-type View = 'list' | 'add' | 'wordbooks' | 'review' | 'settings' | 'ai-memory';
+type View = 'home' | 'list' | 'add' | 'wordbooks' | 'review' | 'settings' | 'ai-memory';
 
 interface NavbarProps {
   currentView: View;
@@ -17,12 +17,13 @@ export function Navbar({ currentView, onViewChange }: NavbarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navItems: { id: View; label: string; icon: string }[] = [
-    { id: 'list', label: 'Words', icon: '📚' },
-    { id: 'add', label: 'Add', icon: '➕' },
+    { id: 'home', label: '首页', icon: '🏠' },
+    { id: 'list', label: '单词列表', icon: '📚' },
+    { id: 'add', label: '添加', icon: '➕' },
     { id: 'wordbooks', label: '单词书', icon: '📖' },
-    { id: 'review', label: 'Review', icon: '🔄' },
-    { id: 'ai-memory', label: 'AI Memory', icon: '🤖' },
-    { id: 'settings', label: 'Settings', icon: '⚙️' },
+    { id: 'review', label: '复习', icon: '🔄' },
+    { id: 'ai-memory', label: 'AI 记忆', icon: '🤖' },
+    { id: 'settings', label: '设置', icon: '⚙️' },
   ];
 
   return (
