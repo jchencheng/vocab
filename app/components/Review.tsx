@@ -172,6 +172,17 @@ export function Review() {
         const shuffled = shuffleWordsWithSeed(filteredWords, seed);
         const limited = limitWords(shuffled, maxDailyReviews);
 
+        // 推迟超出限制的单词（避免单词堆积）
+        if (shuffled.length > maxDailyReviews) {
+          const postponedWords = shuffled.slice(maxDailyReviews);
+          console.log('Postponing', postponedWords.length, 'words beyond daily limit');
+          
+          const postponed = postponeWithPriority(postponedWords);
+          for (const word of postponed) {
+            await updateWord(word);
+          }
+        }
+
         // 恢复进度或从头开始
         const startIndex = Math.min(savedIndex, limited.length);
         const isCompletedToday = startIndex >= limited.length;
