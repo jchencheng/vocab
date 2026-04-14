@@ -52,42 +52,33 @@ export async function GET(request: NextRequest) {
       ...(customBooks?.map((b: any) => b.id) || [])
     ].filter(Boolean);
 
-    const stats: Record<string, any> = {};
-    let debugInfo: any = {};
-    
-    if (allBookIds.length > 0) {
-      // 查询 word_book_items
-      const { data: itemsData, error: itemsError, count } = await supabase
-        .from('word_book_items')
-        .select('word_book_id, status', { count: 'exact' })
-        .in('word_book_id', allBookIds);
+    // 去重
+    const uniqueBookIds = [...new Set(allBookIds)];
 
-      debugInfo = {
-        bookIds: allBookIds,
-        itemsError: itemsError?.message || null,
-        itemsCount: count,
-        itemsDataLength: itemsData?.length || 0,
-        sampleData: itemsData?.slice(0, 3) || []
-      };
+    const stats: Record<string, any> = {};
+    
+    // 为每本书单独查询统计，避免 1000 条限制
+    for (const bookId of uniqueBookIds) {
+      const { data: itemsData, error: itemsError } = await supabase
+        .from('word_book_items')
+        .select('status')
+        .eq('word_book_id', bookId);
 
       if (!itemsError && itemsData) {
-        for (const bookId of allBookIds) {
-          const bookItems = itemsData.filter((item: any) => item.word_book_id === bookId);
-          const total = bookItems.length;
-          const mastered = bookItems.filter((item: any) => item.status === 'mastered').length;
-          const learning = bookItems.filter((item: any) => item.status === 'learning').length;
-          const ignored = bookItems.filter((item: any) => item.status === 'ignored').length;
-          const newWords = bookItems.filter((item: any) => item.status === 'new' || !item.status).length;
-          
-          stats[bookId] = {
-            total,
-            mastered,
-            learning,
-            ignored,
-            new: newWords,
-            progress: total > 0 ? Math.round((mastered / total) * 100) : 0
-          };
-        }
+        const total = itemsData.length;
+        const mastered = itemsData.filter((item: any) => item.status === 'mastered').length;
+        const learning = itemsData.filter((item: any) => item.status === 'learning').length;
+        const ignored = itemsData.filter((item: any) => item.status === 'ignored').length;
+        const newWords = itemsData.filter((item: any) => item.status === 'new' || !item.status).length;
+        
+        stats[bookId] = {
+          total,
+          mastered,
+          learning,
+          ignored,
+          new: newWords,
+          progress: total > 0 ? Math.round((mastered / total) * 100) : 0
+        };
       }
     }
 
@@ -95,8 +86,7 @@ export async function GET(request: NextRequest) {
       systemBooks: systemBooks || [],
       learningSequence: learningSequence || [],
       customBooks: customBooks || [],
-      stats,
-      debug: debugInfo  // 添加调试信息
+      stats
     });
   } catch (error: any) {
     console.error('Error fetching wordbooks:', error);
