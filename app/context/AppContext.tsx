@@ -177,7 +177,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const data = await fetchWordBooks(user.id);
       setSystemBooks(data.systemBooks);
       setLearningSequence(data.learningSequence);
-      setWordBooks([...data.learningSequence.map((item: any) => item.word_book!).filter(Boolean), ...data.customBooks]);
+      
+      // 合并学习序列中的单词书和自定义单词书，并添加 stats 中的 wordCount
+      const booksFromSequence = data.learningSequence.map((item: any) => {
+        const book = item.word_book!;
+        const bookStats = data.stats?.[book.id];
+        return {
+          ...book,
+          wordCount: bookStats?.total || 0,
+          masteredCount: bookStats?.mastered || 0,
+          learningCount: bookStats?.learning || 0,
+        };
+      }).filter(Boolean);
+      
+      const customBooksWithStats = data.customBooks.map((book: any) => {
+        const bookStats = data.stats?.[book.id];
+        return {
+          ...book,
+          wordCount: bookStats?.total || 0,
+          masteredCount: bookStats?.mastered || 0,
+          learningCount: bookStats?.learning || 0,
+        };
+      });
+      
+      setWordBooks([...booksFromSequence, ...customBooksWithStats]);
     } catch (error) {
       console.error('Error refreshing wordbooks:', error);
     }

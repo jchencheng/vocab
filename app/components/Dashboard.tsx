@@ -48,14 +48,16 @@ export function Dashboard({ onViewChange }: DashboardProps) {
         // 计算今日已完成数量
         const completedToday = dailyProgress?.completedWordIds?.length || 0;
 
-        // 从 wordBooks 计算总单词数
+        // 从 wordBooks 计算统计数据
         const totalWords = wordBooks.reduce((sum, book) => sum + (book.wordCount || 0), 0);
+        const mastered = wordBooks.reduce((sum, book) => sum + ((book as any).masteredCount || 0), 0);
+        const learning = wordBooks.reduce((sum, book) => sum + ((book as any).learningCount || 0), 0);
 
         setStats({
           totalWords,
           dueToday: dueTodayCount,
-          mastered: 0, // 暂时无法从 wordBooks 获取
-          learning: 0, // 暂时无法从 wordBooks 获取
+          mastered,
+          learning,
           completedToday,
           streak: 0,
         });
