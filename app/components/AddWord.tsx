@@ -5,10 +5,11 @@ import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { fetchWordFromDictionary, translateDefinitionsToChinese } from '../services/dictionaryAPI';
 import { checkWordExists, addWordWithCheck } from '../services/wordAPI';
+import { fetchWordBooks, createWordBook, addToLearningSequence } from '../services/wordbookAPI';
 import { parseTags } from '../utils/formatters';
 import { DuplicateWarning } from './DuplicateWarning';
 import { BuiltinMeaningsCard } from './BuiltinMeaningsCard';
-import type { Word, WordCheckResult } from '../types';
+import type { Word, WordCheckResult, WordBook } from '../types';
 
 export function AddWord() {
   const { addWord } = useApp();
@@ -319,6 +320,33 @@ export function AddWord() {
     setModelMessage('您可以继续添加此单词（将创建新记录）');
   }, []);
 
+  // 获取或创建自定义单词书
+  const getOrCreateCustomWordBook = async (userId: string): Promise<WordBook | null> => {
+    try {
+      // 获取用户的单词书列表
+      const { customBooks } = await fetchWordBooks(userId);
+      
+      // 查找是否已有"自定义单词书"
+      let customBook = customBooks.find(book => book.name === '自定义单词书');
+      
+      if (!customBook) {
+        // 创建新的自定义单词书
+        customBook = await createWordBook(userId, {
+          name: '自定义单词书',
+          description: '用户手动添加的单词集合',
+        });
+        
+        // 自动添加到学习序列
+        await addToLearningSequence(userId, customBook.id, customBooks.length === 0);
+      }
+      
+      return customBook;
+    } catch (err) {
+      console.error('Error getting/creating custom wordbook:', err);
+      return null;
+    }
+  };
+
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -357,8 +385,23 @@ export function AddWord() {
         isFromDictionary,
       });
 
+      // 将单词添加到自定义单词书
+      const customBook = await getOrCreateCustomWordBook(user.id);
+      if (customBook) {
+        // 调用 API 将单词添加到单词书
+        await fetch(`/api/wordbooks/${customBook.id}/words`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            userId: user.id, 
+            wordId: newWord.id,
+            sourceType: 'custom'
+          }),
+        });
+      }
+
       // 显示成功提示
-      setSuccessMessage(`"${newWord.word}" added successfully!`);
+      setSuccessMessage(`"${newWord.word}" 已添加到自定义单词书！`);
       
       // 3秒后清除成功提示
       setTimeout(() => {

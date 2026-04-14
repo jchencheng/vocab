@@ -8,7 +8,6 @@ import { Dashboard } from './Dashboard';
 import { Suspense, lazy, useState } from 'react';
 
 // 懒加载其他页面组件
-const WordList = lazy(() => import('./WordList').then(m => ({ default: m.WordList })));
 const AddWord = lazy(() => import('./AddWord').then(m => ({ default: m.AddWord })));
 const WordBookList = lazy(() => import('./WordBookList').then(m => ({ default: m.WordBookList })));
 const Review = lazy(() => import('./Review').then(m => ({ default: m.Review })));
@@ -24,7 +23,7 @@ function PageSkeleton() {
   );
 }
 
-type View = 'home' | 'list' | 'add' | 'wordbooks' | 'review' | 'settings' | 'ai-memory';
+type View = 'home' | 'add' | 'wordbooks' | 'review' | 'settings' | 'ai-memory';
 
 interface HomeClientProps {
   userId: string;
@@ -53,11 +52,6 @@ export function HomeClient({ userId }: HomeClientProps) {
       <main className="container mx-auto px-4 py-8">
         <div className="animate-fade-in">
           {currentView === 'home' && <Dashboard onViewChange={setCurrentView} />}
-          {currentView === 'list' && (
-            <Suspense fallback={<PageSkeleton />}>
-              <WordList />
-            </Suspense>
-          )}
           {currentView === 'add' && (
             <Suspense fallback={<PageSkeleton />}>
               <AddWord />

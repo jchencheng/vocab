@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
 import { useState } from 'react';
 
-type View = 'home' | 'list' | 'add' | 'wordbooks' | 'review' | 'settings' | 'ai-memory';
+type View = 'home' | 'add' | 'wordbooks' | 'review' | 'settings' | 'ai-memory';
 
 interface NavbarProps {
   currentView: View;
@@ -18,7 +18,6 @@ export function Navbar({ currentView, onViewChange }: NavbarProps) {
 
   const navItems: { id: View; label: string; icon: string }[] = [
     { id: 'home', label: '首页', icon: '🏠' },
-    { id: 'list', label: '单词列表', icon: '📚' },
     { id: 'add', label: '添加', icon: '➕' },
     { id: 'wordbooks', label: '单词书', icon: '📖' },
     { id: 'review', label: '复习', icon: '🔄' },

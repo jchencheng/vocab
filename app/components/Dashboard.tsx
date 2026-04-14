@@ -15,7 +15,7 @@ interface DashboardStats {
 }
 
 interface DashboardProps {
-  onViewChange: (view: 'list' | 'add' | 'wordbooks' | 'review' | 'settings' | 'ai-memory') => void;
+  onViewChange: (view: 'add' | 'wordbooks' | 'review' | 'settings' | 'ai-memory') => void;
 }
 
 export function Dashboard({ onViewChange }: DashboardProps) {
