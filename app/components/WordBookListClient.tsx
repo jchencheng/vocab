@@ -3,8 +3,6 @@
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import useSWR from 'swr';
-import { useAuth } from '../context/AuthContext';
-import { useApp } from '../context/AppContext';
 import { WordBookCard } from './WordBookCard';
 import { StudyModeSelector } from './StudyModeSelector';
 import type { WordBook, StudyMode, WordBookStats } from '../types';
@@ -15,51 +13,64 @@ import {
   setPrimaryWordBook,
   createWordBook
 } from '../services/wordbookAPI';
+import { useApp } from '../context/AppContext';
+
+interface WordBookListClientProps {
+  initialData: {
+    systemBooks: WordBook[];
+    learningSequence: any[];
+    customBooks: WordBook[];
+    stats: Record<string, WordBookStats>;
+  };
+  userId: string;
+}
 
 // SWR fetcher
 const wordbooksFetcher = async (userId: string) => {
   return fetchWordBooks(userId);
 };
 
-export function WordBookList() {
+export function WordBookListClient({ initialData, userId }: WordBookListClientProps) {
   const router = useRouter();
-  const { user } = useAuth();
   const { settings, saveSettings } = useApp();
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [newBookName, setNewBookName] = useState('');
-  const [newBookDescription, setNewBookDescription] = useState('');
-  const [isMutating, setIsMutating] = useState(false);
-
-  // SWR 客户端缓存 - 优化加载体验
-  const { data, mutate, isValidating, isLoading } = useSWR(
-    user?.id ? ['wordbooks', user.id] : null,
-    () => wordbooksFetcher(user!.id),
+  
+  // SWR 客户端缓存
+  const { data, mutate, isValidating } = useSWR(
+    userId ? ['wordbooks', userId] : null,
+    () => wordbooksFetcher(userId),
     {
+      fallbackData: {
+        systemBooks: initialData.systemBooks,
+        learningSequence: initialData.learningSequence,
+        customBooks: initialData.customBooks,
+        stats: initialData.stats
+      },
       revalidateOnFocus: true,
       revalidateOnReconnect: true,
-      dedupingInterval: 5000,
+      dedupingInterval: 5000, // 5秒内重复请求去重
     }
   );
 
-  const systemBooks = data?.systemBooks || [];
-  const learningSequence = data?.learningSequence || [];
-  const customBooks = data?.customBooks || [];
-  const bookStats = data?.stats || {};
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newBookName, setNewBookName] = useState('');
+  const [newBookDescription, setNewBookDescription] = useState('');
+  const [bookStats, setBookStats] = useState<Record<string, WordBookStats>>(initialData.stats);
+  const [isMutating, setIsMutating] = useState(false);
+
+  const systemBooks = data?.systemBooks || initialData.systemBooks;
+  const learningSequence = data?.learningSequence || initialData.learningSequence;
+  const customBooks = data?.customBooks || initialData.customBooks;
 
   const handleModeChange = useCallback(async (mode: StudyMode) => {
     await saveSettings({ ...settings, studyMode: mode });
   }, [settings, saveSettings]);
 
   const handleAddToSequence = async (bookId: string) => {
-    if (!user) {
-      alert('请先登录');
-      return;
-    }
     try {
       setIsMutating(true);
       const isFirstBook = learningSequence.length === 0;
-      await addToLearningSequence(user.id, bookId, isFirstBook);
-      await mutate(); // SWR 重新验证
+      await addToLearningSequence(userId, bookId, isFirstBook);
+      await mutate(); // 触发 SWR 重新验证
       if (isFirstBook) {
         await saveSettings({ ...settings, primaryWordBookId: bookId });
       }
@@ -78,12 +89,11 @@ export function WordBookList() {
   };
 
   const handleRemoveFromSequence = async (bookId: string) => {
-    if (!user) return;
     if (!confirm('确定要从学习序列中移除此单词书吗？')) return;
     try {
       setIsMutating(true);
-      await removeFromLearningSequence(user.id, bookId);
-      await mutate(); // SWR 重新验证
+      await removeFromLearningSequence(userId, bookId);
+      await mutate(); // 触发 SWR 重新验证
       if (settings.primaryWordBookId === bookId) {
         await saveSettings({ ...settings, primaryWordBookId: null });
       }
@@ -96,12 +106,11 @@ export function WordBookList() {
   };
 
   const handleSetPrimary = async (bookId: string) => {
-    if (!user) return;
     try {
       setIsMutating(true);
-      await setPrimaryWordBook(user.id, bookId);
+      await setPrimaryWordBook(userId, bookId);
       await saveSettings({ ...settings, primaryWordBookId: bookId });
-      await mutate(); // SWR 重新验证
+      await mutate(); // 触发 SWR 重新验证
     } catch (error) {
       console.error('Error setting primary:', error);
       alert('设置主学单词书失败');
@@ -111,17 +120,17 @@ export function WordBookList() {
   };
 
   const handleCreateBook = async () => {
-    if (!user || !newBookName.trim()) return;
+    if (!newBookName.trim()) return;
     try {
       setIsMutating(true);
-      await createWordBook(user.id, {
+      await createWordBook(userId, {
         name: newBookName.trim(),
         description: newBookDescription.trim() || undefined
       });
       setNewBookName('');
       setNewBookDescription('');
       setShowCreateModal(false);
-      await mutate(); // SWR 重新验证
+      await mutate(); // 触发 SWR 重新验证
     } catch (error) {
       console.error('Error creating book:', error);
       alert('创建单词书失败');
@@ -131,7 +140,9 @@ export function WordBookList() {
   };
 
   // 获取学习序列中的单词书 ID 集合
-  const sequenceBookIds = new Set(learningSequence.map((item: any) => item.word_book_id || item.wordBookId));
+  const sequenceBookIds = new Set(learningSequence.map((item: any) => 
+    item.word_book_id || item.wordBookId
+  ));
 
   // 过滤出未添加的系统单词书
   const availableSystemBooks = systemBooks.filter(book => !sequenceBookIds.has(book.id));
@@ -146,14 +157,6 @@ export function WordBookList() {
       isPrimary: item.is_primary || item.isPrimary
     };
   });
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <div className="animate-spin rounded-full h-10 w-10 border-4 border-primary-200 border-t-primary-600"></div>
-      </div>
-    );
-  }
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -178,7 +181,7 @@ export function WordBookList() {
         </div>
       </div>
 
-      {/* 同步状态指示器 */}
+      {/* 加载状态指示器 */}
       {isValidating && (
         <div className="mb-4 flex items-center gap-2 text-sm text-slate-500">
           <div className="w-4 h-4 border-2 border-slate-300 border-t-primary-600 rounded-full animate-spin" />
@@ -270,7 +273,7 @@ export function WordBookList() {
               <button
                 onClick={() => setShowCreateModal(false)}
                 disabled={isMutating}
-                className="px-4 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50 rounded-lg transition-colors"
+                className="px-4 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
               >
                 取消
               </button>

@@ -1,4 +1,4 @@
-import type { WordBook, CreateWordBookRequest, LearningSequenceItem, StudyMode, Word } from '../types';
+import type { WordBook, CreateWordBookRequest, LearningSequenceItem, StudyMode, Word, WordBookStats } from '../types';
 
 const API_BASE = '/api';
 
@@ -7,6 +7,7 @@ export async function fetchWordBooks(userId: string): Promise<{
   systemBooks: WordBook[];
   learningSequence: LearningSequenceItem[];
   customBooks: WordBook[];
+  stats: Record<string, WordBookStats>;
 }> {
   const response = await fetch(`${API_BASE}/wordbooks?userId=${userId}`);
   if (!response.ok) throw new Error('Failed to fetch wordbooks');
