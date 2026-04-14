@@ -518,6 +518,27 @@ export async function PUT(request: NextRequest) {
         console.error('Error updating word progress:', progressError);
         return NextResponse.json({ error: progressError.message }, { status: 500 });
       }
+      
+      // 根据复习次数和间隔确定状态，并更新 word_book_items
+      let newStatus: string;
+      if (word.reviewCount >= 5 && word.interval >= 21) {
+        newStatus = 'mastered';
+      } else if (word.reviewCount > 0) {
+        newStatus = 'learning';
+      } else {
+        newStatus = 'new';
+      }
+      
+      // 更新 word_book_items 的 status（触发器会自动更新 word_books 计数）
+      const { error: itemError } = await supabase
+        .from('word_book_items')
+        .update({ status: newStatus })
+        .eq('word_id', word.id);
+      
+      if (itemError) {
+        console.error('Error updating word_book_items status:', itemError);
+        // 非致命错误，继续执行
+      }
     }
 
     return NextResponse.json({ success: true });
