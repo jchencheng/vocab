@@ -3,8 +3,7 @@
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { useEffect, useState } from 'react';
-import { fetchWords, fetchDueTodayCount, fetchDailyProgress } from '../services/apiClient';
-import type { Word } from '../types';
+import { fetchDueTodayCount, fetchDailyProgress } from '../services/apiClient';
 
 interface DashboardStats {
   totalWords: number;
@@ -15,20 +14,13 @@ interface DashboardStats {
   streak: number;
 }
 
-interface RecentWord {
-  id: string;
-  word: string;
-  phonetic?: string;
-  createdAt: number;
-}
-
 interface DashboardProps {
   onViewChange: (view: 'list' | 'add' | 'wordbooks' | 'review' | 'settings' | 'ai-memory') => void;
 }
 
 export function Dashboard({ onViewChange }: DashboardProps) {
   const { user } = useAuth();
-  const { settings } = useApp();
+  const { settings, wordBooks } = useApp();
   const [stats, setStats] = useState<DashboardStats>({
     totalWords: 0,
     dueToday: 0,
@@ -37,7 +29,6 @@ export function Dashboard({ onViewChange }: DashboardProps) {
     completedToday: 0,
     streak: 0,
   });
-  const [recentWords, setRecentWords] = useState<RecentWord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -48,37 +39,29 @@ export function Dashboard({ onViewChange }: DashboardProps) {
       try {
         setIsLoading(true);
 
-        // 并行获取数据
-        const [words, dueTodayCount, dailyProgress] = await Promise.all([
-          fetchWords(userId),
+        // 并行获取数据（只获取必要的数据）
+        const [dueTodayCount, dailyProgress] = await Promise.all([
           fetchDueTodayCount(userId, settings.maxDailyReviews),
           fetchDailyProgress(userId),
         ]);
 
-        // 计算统计数据
-        const mastered = words.filter(w => w.interval >= 30).length;
-        const learning = words.filter(w => w.interval < 30 && w.reviewCount > 0).length;
-
         // 计算今日已完成数量
         const completedToday = dailyProgress?.completedWordIds?.length || 0;
 
-        // 获取最近添加的单词（限制10个）
-        const recent: RecentWord[] = words.slice(0, 10).map((w: Word) => ({
-          id: w.id,
-          word: w.word,
-          phonetic: w.phonetic,
-          createdAt: w.createdAt,
-        }));
+        // 从 wordBooks 计算统计数据
+        const allWords = wordBooks.flatMap(book => book.words || []);
+        const totalWords = allWords.length;
+        const mastered = allWords.filter(w => w.interval >= 30).length;
+        const learning = allWords.filter(w => w.interval < 30 && w.reviewCount > 0).length;
 
         setStats({
-          totalWords: words.length,
+          totalWords,
           dueToday: dueTodayCount,
           mastered,
           learning,
           completedToday,
-          streak: 0, // 暂时无法获取，需要额外的 API
+          streak: 0,
         });
-        setRecentWords(recent);
       } catch (error) {
         console.error('Error loading dashboard data:', error);
       } finally {
@@ -87,7 +70,7 @@ export function Dashboard({ onViewChange }: DashboardProps) {
     }
 
     loadDashboardData();
-  }, [user?.id, settings.maxDailyReviews]);
+  }, [user?.id, settings.maxDailyReviews, wordBooks]);
 
   const dailyGoal = settings.maxDailyReviews || 20;
   const progressPercent = Math.min((stats.completedToday / dailyGoal) * 100, 100);
@@ -223,41 +206,6 @@ export function Dashboard({ onViewChange }: DashboardProps) {
           </div>
         </button>
       </div>
-
-      {/* 最近添加的单词 */}
-      {recentWords.length > 0 && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">最近添加</h2>
-            <button
-              onClick={() => onViewChange('list')}
-              className="text-sm text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
-            >
-              查看全部 →
-            </button>
-          </div>
-          <div className="space-y-2">
-            {recentWords.map((word) => (
-              <div
-                key={word.id}
-                className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
-              >
-                <div>
-                  <span className="font-medium text-gray-900 dark:text-white">{word.word}</span>
-                  {word.phonetic && (
-                    <span className="text-sm text-gray-500 dark:text-gray-400 ml-2">
-                      {word.phonetic}
-                    </span>
-                  )}
-                </div>
-                <span className="text-xs text-gray-400 dark:text-gray-500">
-                  {new Date(word.createdAt).toLocaleDateString('zh-CN')}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
