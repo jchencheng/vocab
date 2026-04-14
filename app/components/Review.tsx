@@ -109,11 +109,19 @@ export function Review() {
             const unreviewedWords = finalQueue.slice(startIndex);
             
             // 根据新的学习模式重新排序未复习的单词
-            const reorderedUnreviewed = getDueWordsByStudyMode(
-              unreviewedWords,
-              studyMode,
-              primaryBookWordIds
-            );
+            let reorderedUnreviewed: Word[];
+            if (studyMode === 'book-only') {
+              // 只保留主单词书的单词
+              reorderedUnreviewed = unreviewedWords.filter(w => primaryBookWordIds.has(w.id));
+            } else if (studyMode === 'book-priority') {
+              // 主单词书单词在前，其他在后
+              const primaryWords = unreviewedWords.filter(w => primaryBookWordIds.has(w.id));
+              const otherWords = unreviewedWords.filter(w => !primaryBookWordIds.has(w.id));
+              reorderedUnreviewed = [...primaryWords, ...otherWords];
+            } else {
+              // mixed 模式，保持原顺序
+              reorderedUnreviewed = unreviewedWords;
+            }
             
             // 合并：已复习的单词 + 重新排序的未复习单词
             finalQueue = [...reviewedWords, ...reorderedUnreviewed];
