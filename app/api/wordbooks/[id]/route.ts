@@ -24,18 +24,11 @@ export async function GET(
       );
     }
 
-    // 获取统计信息
-    const { data: stats, error: statsError } = await supabase
-      .from('word_book_items')
-      .select('status')
-      .eq('word_book_id', params.id);
-
-    if (statsError) throw statsError;
-
-    const total = stats?.length || 0;
-    const mastered = stats?.filter((s: any) => s.status === 'mastered').length || 0;
-    const learning = stats?.filter((s: any) => s.status === 'learning').length || 0;
-    const ignored = stats?.filter((s: any) => s.status === 'ignored').length || 0;
+    // 从 word_books 表的计数字段获取统计（避免 1000 条查询限制）
+    const total = book.word_count || 0;
+    const mastered = book.mastered_count || 0;
+    const learning = book.learning_count || 0;
+    const ignored = book.ignored_count || 0;
 
     // 检查是否在学习序列中
     let inSequence = false;
