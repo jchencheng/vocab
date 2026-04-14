@@ -3,7 +3,7 @@
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { useEffect, useState } from 'react';
-import { fetchWords } from '../services/apiClient';
+import { fetchWords, fetchDueTodayCount, fetchDailyProgress } from '../services/apiClient';
 import type { Word } from '../types';
 
 interface DashboardStats {
@@ -47,14 +47,20 @@ export function Dashboard({ onViewChange }: DashboardProps) {
     async function loadDashboardData() {
       try {
         setIsLoading(true);
-        const now = Date.now();
 
-        // 使用 API 客户端获取单词数据
-        const words = await fetchWords(userId);
-        
-        const dueToday = words.filter(w => w.nextReviewAt <= now).length;
+        // 并行获取数据
+        const [words, dueTodayCount, dailyProgress] = await Promise.all([
+          fetchWords(userId),
+          fetchDueTodayCount(userId, settings.maxDailyReviews),
+          fetchDailyProgress(userId),
+        ]);
+
+        // 计算统计数据
         const mastered = words.filter(w => w.interval >= 30).length;
         const learning = words.filter(w => w.interval < 30 && w.reviewCount > 0).length;
+
+        // 计算今日已完成数量
+        const completedToday = dailyProgress?.completedWordIds?.length || 0;
 
         // 获取最近添加的单词（限制10个）
         const recent: RecentWord[] = words.slice(0, 10).map((w: Word) => ({
@@ -66,10 +72,10 @@ export function Dashboard({ onViewChange }: DashboardProps) {
 
         setStats({
           totalWords: words.length,
-          dueToday,
+          dueToday: dueTodayCount,
           mastered,
           learning,
-          completedToday: 0, // 暂时无法获取，需要额外的 API
+          completedToday,
           streak: 0, // 暂时无法获取，需要额外的 API
         });
         setRecentWords(recent);
@@ -81,7 +87,7 @@ export function Dashboard({ onViewChange }: DashboardProps) {
     }
 
     loadDashboardData();
-  }, [user?.id]);
+  }, [user?.id, settings.maxDailyReviews]);
 
   const dailyGoal = settings.maxDailyReviews || 20;
   const progressPercent = Math.min((stats.completedToday / dailyGoal) * 100, 100);
