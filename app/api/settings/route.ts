@@ -1,12 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '../services/supabase';
 
-// 将驼峰式字段名转换为下划线式
+// 将驼峰式字段名转换为下划线式（保存到数据库）
 function mapSettingsToDB(settings: any) {
   return {
     max_daily_reviews: settings.maxDailyReviews || 50,
     dark_mode: settings.darkMode || false,
+    study_mode: settings.studyMode || 'book-priority',
+    primary_word_book_id: settings.primaryWordBookId || null,
     updated_at: Date.now(),
+  };
+}
+
+// 将下划线式字段名转换为驼峰式（从数据库读取）
+function mapSettingsFromDB(data: any) {
+  return {
+    maxDailyReviews: data.max_daily_reviews || 50,
+    darkMode: data.dark_mode || false,
+    studyMode: data.study_mode || 'book-priority',
+    primaryWordBookId: data.primary_word_book_id || null,
   };
 }
 
@@ -35,7 +47,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json(data);
+    return NextResponse.json(mapSettingsFromDB(data));
   } catch (error: any) {
     console.error('API error:', error);
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
