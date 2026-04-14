@@ -48,11 +48,11 @@ export async function GET(request: NextRequest) {
     // 构建 stats 对象（从 word_books 表的计数字段读取）
     const stats: Record<string, any> = {};
     
-    // 从 systemBooks 构建 stats
-    for (const book of (systemBooks || [])) {
+    // 辅助函数：从 book 对象构建 stats
+    const buildStats = (book: any) => {
       const total = book.word_count || 0;
       const mastered = book.mastered_count || 0;
-      stats[book.id] = {
+      return {
         total,
         mastered,
         learning: book.learning_count || 0,
@@ -60,20 +60,24 @@ export async function GET(request: NextRequest) {
         new: book.new_count || 0,
         progress: total > 0 ? Math.round((mastered / total) * 100) : 0
       };
+    };
+    
+    // 从 systemBooks 构建 stats
+    for (const book of (systemBooks || [])) {
+      stats[book.id] = buildStats(book);
     }
     
     // 从 customBooks 构建 stats
     for (const book of (customBooks || [])) {
-      const total = book.word_count || 0;
-      const mastered = book.mastered_count || 0;
-      stats[book.id] = {
-        total,
-        mastered,
-        learning: book.learning_count || 0,
-        ignored: book.ignored_count || 0,
-        new: book.new_count || 0,
-        progress: total > 0 ? Math.round((mastered / total) * 100) : 0
-      };
+      stats[book.id] = buildStats(book);
+    }
+    
+    // 从 learningSequence 中的 word_book 构建 stats（包含自定义单词书）
+    for (const item of (learningSequence || [])) {
+      const book = item.word_book;
+      if (book && !stats[book.id]) {
+        stats[book.id] = buildStats(book);
+      }
     }
 
     return NextResponse.json({
