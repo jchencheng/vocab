@@ -1,10 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Word, AIContext, AppSettings } from '../types';
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 // 使用 Publishable Key 进行客户端认证
-// 注意：在 Next.js 中，只有 NEXT_PUBLIC_ 前缀的环境变量才能在客户端访问
-const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || '';
+// 生产环境使用 SUPABASE_PUBLISHABLE_KEY，本地开发使用 NEXT_PUBLIC_ 前缀的版本
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const SUPABASE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || '';
 
 // 客户端 Supabase 配置
 export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
