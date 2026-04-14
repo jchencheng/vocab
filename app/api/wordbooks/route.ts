@@ -53,19 +53,24 @@ export async function GET(request: NextRequest) {
     ].filter(Boolean);
 
     const stats: Record<string, any> = {};
+    let debugInfo: any = {};
     
     if (allBookIds.length > 0) {
-      // 使用 RPC 或直接查询获取准确的统计
-      const { data: itemsData, error: itemsError } = await supabase
+      // 查询 word_book_items
+      const { data: itemsData, error: itemsError, count } = await supabase
         .from('word_book_items')
-        .select('word_book_id, status')
+        .select('word_book_id, status', { count: 'exact' })
         .in('word_book_id', allBookIds);
 
-      if (itemsError) {
-        console.error('Error fetching word_book_items:', itemsError);
-      } else if (itemsData) {
-        console.log('Word book items data:', itemsData.length, 'items for books:', allBookIds);
-        
+      debugInfo = {
+        bookIds: allBookIds,
+        itemsError: itemsError?.message || null,
+        itemsCount: count,
+        itemsDataLength: itemsData?.length || 0,
+        sampleData: itemsData?.slice(0, 3) || []
+      };
+
+      if (!itemsError && itemsData) {
         for (const bookId of allBookIds) {
           const bookItems = itemsData.filter((item: any) => item.word_book_id === bookId);
           const total = bookItems.length;
@@ -86,22 +91,12 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // 更新 word_books 表的 word_count 为实际数量
-    for (const bookId of allBookIds) {
-      const actualCount = stats[bookId]?.total || 0;
-      if (actualCount > 0) {
-        await supabase
-          .from('word_books')
-          .update({ word_count: actualCount })
-          .eq('id', bookId);
-      }
-    }
-
     return NextResponse.json({
       systemBooks: systemBooks || [],
       learningSequence: learningSequence || [],
       customBooks: customBooks || [],
-      stats
+      stats,
+      debug: debugInfo  // 添加调试信息
     });
   } catch (error: any) {
     console.error('Error fetching wordbooks:', error);
